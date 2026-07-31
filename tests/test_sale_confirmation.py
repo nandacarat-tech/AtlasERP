@@ -166,3 +166,27 @@ def test_cancel_open_sale(client, app):
     with app.app_context():
         product = db.session.get(Product, product_id)
         assert product.stock_quantity == 10
+
+def test_cancel_confirmed_sale_is_rejected(client, app):
+    with app.app_context():
+        sale_id, product_id = create_open_sale()
+
+    confirm_response = client.post(f"/sales/{sale_id}/confirm")
+    cancel_response = client.post(f"/sales/{sale_id}/cancel")
+
+    assert confirm_response.status_code == 200
+    assert cancel_response.status_code == 400
+    assert "only open sales" in cancel_response.get_json()["error"]
+
+    with app.app_context():
+        product = db.session.get(Product, product_id)
+        sale = db.session.get(Sale, sale_id)
+
+        assert product.stock_quantity == 8
+        assert sale.status == "CONFIRMED"
+
+def test_cancel_nonexistent_sale_returns_not_found(client):
+    response = client.post("/sales/999999/cancel")
+
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "sale not found"
