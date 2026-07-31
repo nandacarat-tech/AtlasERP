@@ -5,7 +5,6 @@ from app.customer_models import Customer
 from app.models import Product
 from app.sale_models import Sale
 
-
 def create_sale_data():
     customer = Customer(
         document="12345678900",
@@ -235,3 +234,27 @@ def test_create_sale_rejects_unknown_product(client, app):
 
     assert response.status_code == 404
     assert response.get_json()["error"] == "product not found"
+
+def test_create_sale_rejects_inactive_customer(client, app):
+    with app.app_context():
+        customer_id, product_id = create_sale_data()
+
+        customer = db.session.get(Customer, customer_id)
+        customer.is_active = False
+        db.session.commit()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "customer is inactive"
