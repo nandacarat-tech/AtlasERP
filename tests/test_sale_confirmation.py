@@ -59,7 +59,7 @@ def test_confirm_sale_decreases_stock(client, app):
 
 def test_confirm_sale_cannot_be_confirmed_twice(client, app):
     with app.app_context():
-        sale_id, _ = create_open_sale()
+        sale_id, product_id = create_open_sale()
 
     first_response = client.post(f"/sales/{sale_id}/confirm")
     second_response = client.post(f"/sales/{sale_id}/confirm")
@@ -67,6 +67,14 @@ def test_confirm_sale_cannot_be_confirmed_twice(client, app):
     assert first_response.status_code == 200
     assert second_response.status_code == 400
     assert "only open sales" in second_response.get_json()["error"]
+
+    with app.app_context():
+        product = db.session.get(Product, product_id)
+        sale = db.session.get(Sale, sale_id)
+
+        assert product.stock_quantity == 8
+        assert sale.status == "CONFIRMED"
+
 
 
 def test_confirm_sale_rejects_insufficient_stock(client, app):
