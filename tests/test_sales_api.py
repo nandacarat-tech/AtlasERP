@@ -172,3 +172,46 @@ def test_create_sale_rejects_negative_quantity(client, app):
     assert response.status_code == 400
     assert response.get_json()["error"] == "quantity must be greater than zero"
 
+def test_create_sale_rejects_missing_quantity(client, app):
+    with app.app_context():
+        customer_id, product_id = create_sale_data()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == (
+        "product_id and integer quantity are required"
+    )
+
+
+def test_create_sale_rejects_non_integer_quantity(client, app):
+    with app.app_context():
+        customer_id, product_id = create_sale_data()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": "2",
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == (
+        "product_id and integer quantity are required"
+    )
