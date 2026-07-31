@@ -317,3 +317,86 @@ def test_create_sale_does_not_change_stock_when_one_item_is_insufficient(
         assert second_product.stock_quantity == 1
         assert Sale.query.count() == 0
 
+def test_create_sale_with_multiple_items_updates_total_and_stock(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="11223344556",
+            name="Cliente múltiplos itens",
+        )
+
+        first_product = Product(
+            sku="SKU-MULTI-001",
+            name="Produto múltiplo 1",
+            price=Decimal("10.00"),
+            stock_quantity=8,
+        )
+
+        second_product = Product(
+            sku="SKU-MULTI-002",
+            name="Produto múltiplo 2",
+            price=Decimal("7.50"),
+            stock_quantity=6,
+        )
+
+        db.session.add_all([customer, first_product, second_product])
+        db.session.commit()
+
+        customer_id = customer.id
+        first_product_id = first_product.id
+        second_product_id = second_product.id
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": first_product_id,
+                    "quantity": 3,
+                },
+                {
+                    "product_id": second_product_id,
+                    "quantity": 2,
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+
+    sale_data = response.get_json()
+    sale_id = sale_data["id"]
+
+    confirm_response = client.post(
+        f"/sales/{sale_id}/confirm"
+    )
+
+    assert confirm_response.status_code == 200
+
+    data = confirm_response.get_json()
+
+    assert data["customer_id"] == customer_id
+    assert data["status"] == "CONFIRMED"
+    assert data["total_amount"] == "45.00"
+    assert len(data["items"]) == 2
+
+    items_by_product = {
+        item["product_id"]: item
+        for item in data["items"]
+    }
+
+    assert items_by_product[first_product_id]["quantity"] == 3
+    assert items_by_product[first_product_id]["unit_price"] == "10.00"
+    assert items_by_product[second_product_id]["quantity"] == 2
+    assert items_by_product[second_product_id]["unit_price"] == "7.50"
+
+    with app.app_context():
+        first_product = db.session.get(Product, first_product_id)
+        second_product = db.session.get(Product, second_product_id)
+        sale = db.session.get(Sale, data["id"])
+
+        assert first_product.stock_quantity == 5
+        assert second_product.stock_quantity == 4
+        assert sale is not None
+        assert sale.total_amount == Decimal("45.00")
+        assert len(sale.items) == 2

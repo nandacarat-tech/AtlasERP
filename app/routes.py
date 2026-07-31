@@ -414,9 +414,9 @@ def confirm_sale(sale_id):
         product = item.product
 
         if item.quantity > product.stock_quantity:
-            return jsonify({
-                "error": f"insufficient stock for product {product.sku}"
-            }), 400
+           return jsonify({
+              "error": f"insufficient stock for product {product.sku}"
+        }), 400
 
     for item in sale.items:
         item.product.stock_quantity -= item.quantity
