@@ -1,24 +1,8 @@
-﻿from app import create_app, db
+﻿from app import db
 from app.models import Product
 
 
-def make_app():
-    app = create_app()
-    app.config.update(
-        TESTING=True,
-        SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
-    )
-
-    with app.app_context():
-        db.drop_all()
-        db.create_all()
-
-    return app
-
-
-def test_list_products():
-    app = make_app()
-
+def test_list_products(client, app):
     with app.app_context():
         db.session.add(Product(
             sku="SKU-001",
@@ -28,7 +12,6 @@ def test_list_products():
         ))
         db.session.commit()
 
-    client = app.test_client()
     response = client.get("/products")
 
     assert response.status_code == 200
@@ -36,10 +19,7 @@ def test_list_products():
     assert response.get_json()[0]["sku"] == "SKU-001"
 
 
-def test_create_product():
-    app = make_app()
-    client = app.test_client()
-
+def test_create_product(client):
     response = client.post(
         "/products",
         json={
@@ -55,10 +35,7 @@ def test_create_product():
     assert response.get_json()["price"] == "29.90"
 
 
-def test_create_product_rejects_missing_fields():
-    app = make_app()
-    client = app.test_client()
-
+def test_create_product_rejects_missing_fields(client):
     response = client.post(
         "/products",
         json={"name": "Produto incompleto"},

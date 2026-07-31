@@ -1,19 +1,5 @@
-﻿from app import create_app, db
+﻿from app import db
 from app.models import Product
-
-
-def make_app():
-    app = create_app()
-    app.config.update(
-        TESTING=True,
-        SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
-    )
-
-    with app.app_context():
-        db.drop_all()
-        db.create_all()
-
-    return app
 
 
 def create_test_product():
@@ -30,27 +16,23 @@ def create_test_product():
     return product
 
 
-def test_get_product():
-    app = make_app()
-
+def test_get_product(client, app):
     with app.app_context():
         product = create_test_product()
         product_id = product.id
 
-    response = app.test_client().get(f"/products/{product_id}")
+    response = client.get(f"/products/{product_id}")
 
     assert response.status_code == 200
     assert response.get_json()["sku"] == "SKU-001"
 
 
-def test_update_product():
-    app = make_app()
-
+def test_update_product(client, app):
     with app.app_context():
         product = create_test_product()
         product_id = product.id
 
-    response = app.test_client().put(
+    response = client.put(
         f"/products/{product_id}",
         json={
             "name": "Produto atualizado",
@@ -67,14 +49,12 @@ def test_update_product():
     assert data["stock_quantity"] == 25
 
 
-def test_deactivate_product():
-    app = make_app()
-
+def test_deactivate_product(client, app):
     with app.app_context():
         product = create_test_product()
         product_id = product.id
 
-    response = app.test_client().delete(f"/products/{product_id}")
+    response = client.delete(f"/products/{product_id}")
 
     assert response.status_code == 200
     assert response.get_json()["is_active"] is False
