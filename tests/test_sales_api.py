@@ -130,3 +130,45 @@ def test_created_sale_is_persisted(client, app):
         assert sale is not None
         assert sale.total_amount == Decimal("75.00")
         assert len(sale.items) == 1
+
+def test_create_sale_rejects_zero_quantity(client, app):
+    with app.app_context():
+        customer_id, product_id = create_sale_data()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": 0,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "quantity must be greater than zero"
+
+
+def test_create_sale_rejects_negative_quantity(client, app):
+    with app.app_context():
+        customer_id, product_id = create_sale_data()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": -1,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "quantity must be greater than zero"
+
