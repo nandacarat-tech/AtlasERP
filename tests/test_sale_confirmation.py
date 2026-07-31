@@ -123,3 +123,46 @@ def test_confirm_sale_rejects_insufficient_stock(client, app):
 
         assert product.stock_quantity == 1
         assert sale.status == "OPEN"
+def test_cancel_open_sale(client, app):
+    customer_response = client.post(
+        "/customers",
+        json={
+            "name": "Cliente Cancelamento",
+            "document": "99999999999",
+        },
+    )
+    customer_id = customer_response.get_json()["id"]
+
+    product_response = client.post(
+        "/products",
+        json={
+            "sku": "CANCEL-001",
+            "name": "Produto Cancelamento",
+            "price": 25.0,
+            "stock_quantity": 10,
+        },
+    )
+    product_id = product_response.get_json()["id"]
+
+    sale_response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": 2,
+                }
+            ],
+        },
+    )
+    sale_id = sale_response.get_json()["id"]
+
+    response = client.post(f"/sales/{sale_id}/cancel")
+
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "CANCELLED"
+
+    with app.app_context():
+        product = db.session.get(Product, product_id)
+        assert product.stock_quantity == 10

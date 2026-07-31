@@ -425,3 +425,21 @@ def confirm_sale(sale_id):
     db.session.commit()
 
     return jsonify(sale_to_dict(sale))
+@main.post("/sales/<int:sale_id>/cancel")
+def cancel_sale(sale_id):
+    sale = db.session.get(Sale, sale_id)
+
+    if sale is None:
+        return jsonify({"error": "sale not found"}), 404
+
+    if sale.status != "OPEN":
+        return jsonify({"error": "only open sales can be cancelled"}), 400
+
+    sale.status = "CANCELLED"
+    db.session.commit()
+
+    return jsonify({
+        "id": sale.id,
+        "status": sale.status,
+        "total_amount": str(sale.total_amount),
+    }), 200
