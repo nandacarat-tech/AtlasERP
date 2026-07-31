@@ -1,8 +1,7 @@
-﻿from decimal import Decimal, InvalidOperation
-
-from flask import Blueprint, jsonify, request
+﻿from flask import Blueprint, jsonify, request
 
 from app import db
+from app.customer_models import Customer
 from app.models import Product
 
 
@@ -21,6 +20,17 @@ def product_to_dict(product):
     }
 
 
+def customer_to_dict(customer):
+    return {
+        "id": customer.id,
+        "document": customer.document,
+        "name": customer.name,
+        "email": customer.email,
+        "phone": customer.phone,
+        "is_active": customer.is_active,
+    }
+
+
 @main.get("/")
 def index():
     return {
@@ -33,12 +43,13 @@ def index():
 @main.get("/products")
 def list_products():
     products = Product.query.order_by(Product.id).all()
-
     return jsonify([product_to_dict(product) for product in products])
 
 
 @main.post("/products")
 def create_product():
+    from decimal import Decimal, InvalidOperation
+
     data = request.get_json(silent=True) or {}
 
     if any(not data.get(field) for field in ("sku", "name", "price")):
@@ -75,37 +86,20 @@ def create_product():
 @main.get("/products/<int:product_id>")
 def get_product(product_id):
     product = db.get_or_404(Product, product_id)
-
     return jsonify(product_to_dict(product))
 
 
 @main.put("/products/<int:product_id>")
 def update_product(product_id):
+    from decimal import Decimal, InvalidOperation
+
     product = db.get_or_404(Product, product_id)
     data = request.get_json(silent=True) or {}
-
-    if "sku" in data:
-        if not data["sku"]:
-            return jsonify({"error": "sku cannot be empty"}), 400
-
-        existing = Product.query.filter(
-            Product.sku == data["sku"],
-            Product.id != product.id,
-        ).first()
-
-        if existing:
-            return jsonify({"error": "sku already exists"}), 409
-
-        product.sku = data["sku"]
 
     if "name" in data:
         if not data["name"]:
             return jsonify({"error": "name cannot be empty"}), 400
-
         product.name = data["name"]
-
-    if "description" in data:
-        product.description = data["description"]
 
     if "price" in data:
         try:
@@ -131,6 +125,9 @@ def update_product(product_id):
 
         product.stock_quantity = data["stock_quantity"]
 
+    if "description" in data:
+        product.description = data["description"]
+
     if "is_active" in data:
         product.is_active = bool(data["is_active"])
 
@@ -143,7 +140,106 @@ def update_product(product_id):
 def deactivate_product(product_id):
     product = db.get_or_404(Product, product_id)
     product.is_active = False
-
     db.session.commit()
 
     return jsonify(product_to_dict(product))
+
+
+@main.get("/customers")
+def list_customers():
+    customers = Customer.query.order_by(Customer.id).all()
+    return jsonify([customer_to_dict(customer) for customer in customers])
+
+
+@main.post("/customers")
+def create_customer():
+    data = request.get_json(silent=True) or {}
+
+    if not data.get("document") or not data.get("name"):
+        return jsonify({
+            "error": "document and name are required"
+        }), 400
+
+    if Customer.query.filter_by(document=data["document"]).first():
+        return jsonify({"error": "document already exists"}), 409
+
+    if data.get("email"):
+        if Customer.query.filter_by(email=data["email"]).first():
+            return jsonify({"error": "email already exists"}), 409
+
+    customer = Customer(
+        document=data["document"],
+        name=data["name"],
+        email=data.get("email"),
+        phone=data.get("phone"),
+        is_active=data.get("is_active", True),
+    )
+
+    db.session.add(customer)
+    db.session.commit()
+
+    return jsonify(customer_to_dict(customer)), 201
+
+
+@main.get("/customers/<int:customer_id>")
+def get_customer(customer_id):
+    customer = db.get_or_404(Customer, customer_id)
+    return jsonify(customer_to_dict(customer))
+
+
+@main.put("/customers/<int:customer_id>")
+def update_customer(customer_id):
+    customer = db.get_or_404(Customer, customer_id)
+    data = request.get_json(silent=True) or {}
+
+    if "document" in data:
+        if not data["document"]:
+            return jsonify({"error": "document cannot be empty"}), 400
+
+        existing = Customer.query.filter(
+            Customer.document == data["document"],
+            Customer.id != customer.id,
+        ).first()
+
+        if existing:
+            return jsonify({"error": "document already exists"}), 409
+
+        customer.document = data["document"]
+
+    if "name" in data:
+        if not data["name"]:
+            return jsonify({"error": "name cannot be empty"}), 400
+
+        customer.name = data["name"]
+
+    if "email" in data:
+        if data["email"]:
+            existing = Customer.query.filter(
+                Customer.email == data["email"],
+                Customer.id != customer.id,
+            ).first()
+
+            if existing:
+                return jsonify({"error": "email already exists"}), 409
+
+        customer.email = data["email"]
+
+    if "phone" in data:
+        customer.phone = data["phone"]
+
+    if "is_active" in data:
+        customer.is_active = bool(data["is_active"])
+
+    db.session.commit()
+
+    return jsonify(customer_to_dict(customer))
+
+
+@main.delete("/customers/<int:customer_id>")
+def deactivate_customer(customer_id):
+    customer = db.get_or_404(Customer, customer_id)
+    customer.is_active = False
+
+    db.session.commit()
+
+    return jsonify(customer_to_dict(customer))
