@@ -215,3 +215,23 @@ def test_create_sale_rejects_non_integer_quantity(client, app):
     assert response.get_json()["error"] == (
         "product_id and integer quantity are required"
     )
+
+def test_create_sale_rejects_unknown_product(client, app):
+    with app.app_context():
+        customer_id, _ = create_sale_data()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": 9999,
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "product not found"
