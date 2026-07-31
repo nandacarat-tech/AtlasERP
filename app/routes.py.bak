@@ -1,12 +1,11 @@
-﻿from decimal import Decimal, InvalidOperation
-
-from flask import Blueprint, jsonify, request
+﻿from flask import Blueprint, jsonify, request
 
 from app import db
 from app.customer_models import Customer
 from app.models import Product
-from app.sale_models import Sale, SaleItem
+from decimal import Decimal
 
+from app.sale_models import Sale, SaleItem
 
 main = Blueprint("main", __name__)
 
@@ -33,7 +32,6 @@ def customer_to_dict(customer):
         "is_active": customer.is_active,
     }
 
-
 def sale_to_dict(sale):
     return {
         "id": sale.id,
@@ -50,7 +48,6 @@ def sale_to_dict(sale):
             for item in sale.items
         ],
     }
-
 
 @main.get("/")
 def index():
@@ -69,6 +66,8 @@ def list_products():
 
 @main.post("/products")
 def create_product():
+    from decimal import Decimal, InvalidOperation
+
     data = request.get_json(silent=True) or {}
 
     if any(not data.get(field) for field in ("sku", "name", "price")):
@@ -79,19 +78,13 @@ def create_product():
     try:
         price = Decimal(str(data["price"]))
     except (InvalidOperation, ValueError):
-        return jsonify({
-            "error": "price must be a valid number"
-        }), 400
+        return jsonify({"error": "price must be a valid number"}), 400
 
     if price < 0:
-        return jsonify({
-            "error": "price cannot be negative"
-        }), 400
+        return jsonify({"error": "price cannot be negative"}), 400
 
     if Product.query.filter_by(sku=data["sku"]).first():
-        return jsonify({
-            "error": "sku already exists"
-        }), 409
+        return jsonify({"error": "sku already exists"}), 409
 
     product = Product(
         sku=data["sku"],
@@ -116,29 +109,24 @@ def get_product(product_id):
 
 @main.put("/products/<int:product_id>")
 def update_product(product_id):
+    from decimal import Decimal, InvalidOperation
+
     product = db.get_or_404(Product, product_id)
     data = request.get_json(silent=True) or {}
 
     if "name" in data:
         if not data["name"]:
-            return jsonify({
-                "error": "name cannot be empty"
-            }), 400
-
+            return jsonify({"error": "name cannot be empty"}), 400
         product.name = data["name"]
 
     if "price" in data:
         try:
             price = Decimal(str(data["price"]))
         except (InvalidOperation, ValueError):
-            return jsonify({
-                "error": "price must be a valid number"
-            }), 400
+            return jsonify({"error": "price must be a valid number"}), 400
 
         if price < 0:
-            return jsonify({
-                "error": "price cannot be negative"
-            }), 400
+            return jsonify({"error": "price cannot be negative"}), 400
 
         product.price = price
 
@@ -170,7 +158,6 @@ def update_product(product_id):
 def deactivate_product(product_id):
     product = db.get_or_404(Product, product_id)
     product.is_active = False
-
     db.session.commit()
 
     return jsonify(product_to_dict(product))
@@ -192,15 +179,11 @@ def create_customer():
         }), 400
 
     if Customer.query.filter_by(document=data["document"]).first():
-        return jsonify({
-            "error": "document already exists"
-        }), 409
+        return jsonify({"error": "document already exists"}), 409
 
     if data.get("email"):
         if Customer.query.filter_by(email=data["email"]).first():
-            return jsonify({
-                "error": "email already exists"
-            }), 409
+            return jsonify({"error": "email already exists"}), 409
 
     customer = Customer(
         document=data["document"],
@@ -229,9 +212,7 @@ def update_customer(customer_id):
 
     if "document" in data:
         if not data["document"]:
-            return jsonify({
-                "error": "document cannot be empty"
-            }), 400
+            return jsonify({"error": "document cannot be empty"}), 400
 
         existing = Customer.query.filter(
             Customer.document == data["document"],
@@ -239,17 +220,13 @@ def update_customer(customer_id):
         ).first()
 
         if existing:
-            return jsonify({
-                "error": "document already exists"
-            }), 409
+            return jsonify({"error": "document already exists"}), 409
 
         customer.document = data["document"]
 
     if "name" in data:
         if not data["name"]:
-            return jsonify({
-                "error": "name cannot be empty"
-            }), 400
+            return jsonify({"error": "name cannot be empty"}), 400
 
         customer.name = data["name"]
 
@@ -261,9 +238,7 @@ def update_customer(customer_id):
             ).first()
 
             if existing:
-                return jsonify({
-                    "error": "email already exists"
-                }), 409
+                return jsonify({"error": "email already exists"}), 409
 
         customer.email = data["email"]
 
@@ -287,7 +262,6 @@ def deactivate_customer(customer_id):
 
     return jsonify(customer_to_dict(customer))
 
-
 @main.post("/sales")
 def create_sale():
     data = request.get_json(silent=True) or {}
@@ -296,9 +270,7 @@ def create_sale():
     items_data = data.get("items")
 
     if not customer_id:
-        return jsonify({
-            "error": "customer_id is required"
-        }), 400
+        return jsonify({"error": "customer_id is required"}), 400
 
     if not isinstance(items_data, list) or not items_data:
         return jsonify({
@@ -308,22 +280,16 @@ def create_sale():
     customer = db.session.get(Customer, customer_id)
 
     if customer is None:
-        return jsonify({
-            "error": "customer not found"
-        }), 404
+        return jsonify({"error": "customer not found"}), 404
 
     if not customer.is_active:
-        return jsonify({
-            "error": "customer is inactive"
-        }), 400
+        return jsonify({"error": "customer is inactive"}), 400
 
     sale = Sale(
         customer=customer,
         status="OPEN",
         total_amount=Decimal("0.00"),
     )
-
-    db.session.add(sale)
 
     for item_data in items_data:
         product_id = item_data.get("product_id")
@@ -342,18 +308,14 @@ def create_sale():
         product = db.session.get(Product, product_id)
 
         if product is None:
-            return jsonify({
- "error": "product not found"
-            }), 404
+            return jsonify({"error": "product not found"}), 404
 
         if not product.is_active:
-            return jsonify({
-                "error": "product is inactive"
-            }), 400
+            return jsonify({"error": "product is inactive"}), 400
 
         if quantity > product.stock_quantity:
             return jsonify({
-               "error": f"insufficient stock for product {product.sku}"
+                "error": f"insufficient stock for product {product.sku}"
             }), 400
 
         sale.items.append(SaleItem(
@@ -364,10 +326,10 @@ def create_sale():
 
     sale.recalculate_total()
 
+    db.session.add(sale)
     db.session.commit()
 
     return jsonify(sale_to_dict(sale)), 201
-
 
 @main.get("/sales")
 def list_sales():
@@ -384,7 +346,7 @@ def list_sales():
             customer_id = int(customer_id)
         except ValueError:
             return jsonify({
-                "error": "customer_id must be an"
+                "error": "customer_id must be an integer"
             }), 400
 
         query = query.filter_by(customer_id=customer_id)
@@ -394,34 +356,7 @@ def list_sales():
     return jsonify([sale_to_dict(sale) for sale in sales])
 
 
-@main.get("/sales/<int:sale_id>")
-def get_sale(sale_id):
-    sale = db.get_or_404(Sale, sale_id)
-
-    return jsonify(sale_to_dict(sale))
 
 
-@main.post("/sales/<int:sale_id>/confirm")
-def confirm_sale(sale_id):
-    sale = db.get_or_404(Sale, sale_id)
 
-    if sale.status != "OPEN":
-        return jsonify({
-            "error": "only open sales can be confirmed"
-        }), 400
 
-    for item in sale.items:
-        product = item.product
-
-        if item.quantity > product.stock_quantity:
-            return jsonify({
-                "error": f"insufficient stock for product {product.sku}"
-            }), 400
-
-    for item in sale.items:
-        item.product.stock_quantity -= item.quantity
-
-    sale.status = "CONFIRMED"
-    db.session.commit()
-
-    return jsonify(sale_to_dict(sale))

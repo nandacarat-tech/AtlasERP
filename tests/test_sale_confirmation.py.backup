@@ -27,7 +27,6 @@ def create_open_sale():
         status="OPEN",
         total_amount=Decimal("60.00"),
     )
-    db.session.add(sale)
 
     sale.items.append(SaleItem(
         product=product,
@@ -35,6 +34,7 @@ def create_open_sale():
         unit_price=product.price,
     ))
 
+    db.session.add(sale)
     db.session.commit()
 
     return sale.id, product.id
@@ -92,14 +92,13 @@ def test_confirm_sale_rejects_insufficient_stock(client, app):
             total_amount=Decimal("20.00"),
         )
 
-        db.session.add(sale)
-
         sale.items.append(SaleItem(
             product=product,
             quantity=2,
             unit_price=product.price,
         ))
 
+        db.session.add(sale)
         db.session.commit()
         sale_id = sale.id
         product_id = product.id
