@@ -190,3 +190,21 @@ def test_cancel_nonexistent_sale_returns_not_found(client):
 
     assert response.status_code == 404
     assert response.get_json()["error"] == "sale not found"
+
+def test_cancel_sale_cannot_be_cancelled_twice(client, app):
+    with app.app_context():
+        sale_id, product_id = create_open_sale()
+
+    first_response = client.post(f"/sales/{sale_id}/cancel")
+    second_response = client.post(f"/sales/{sale_id}/cancel")
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 400
+    assert "only open sales" in second_response.get_json()["error"]
+
+    with app.app_context():
+        product = db.session.get(Product, product_id)
+        sale = db.session.get(Sale, sale_id)
+
+        assert product.stock_quantity == 10
+        assert sale.status == "CANCELLED"
