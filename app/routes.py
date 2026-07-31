@@ -328,3 +328,53 @@ def create_sale():
             for item in sale.items
         ],
     }), 201
+
+@main.post("/sales/<int:sale_id>/confirm")
+def confirm_sale(sale_id):
+    sale = db.get_or_404(Sale, sale_id)
+
+    if sale.status != "OPEN":
+        return jsonify({
+            "error": "only open sales can be confirmed"
+        }), 400
+
+    for item in sale.items:
+        product = db.session.get(Product, item.product_id)
+
+        if product is None:
+            return jsonify({
+                "error": f"product {item.product_id} not found"
+            }), 404
+
+        if not product.is_active:
+            return jsonify({
+                "error": f"product {product.sku} is inactive"
+            }), 400
+
+        if item.quantity > product.stock_quantity:
+            return jsonify({
+                "error": f"insufficient stock for product {product.sku}"
+            }), 400
+
+    for item in sale.items:
+        product = db.session.get(Product, item.product_id)
+        product.stock_quantity -= item.quantity
+
+    sale.status = "CONFIRMED"
+    db.session.commit()
+
+    return jsonify({
+        "id": sale.id,
+        "customer_id": sale.customer_id,
+        "status": sale.status,
+        "total_amount": str(sale.total_amount),
+        "items": [
+            {
+                "product_id": item.product_id,
+                "quantity": item.quantity,
+                "unit_price": str(item.unit_price),
+                "subtotal": str(item.subtotal),
+            }
+            for item in sale.items
+        ],
+    })
