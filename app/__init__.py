@@ -1,35 +1,34 @@
 ﻿import os
 
 from flask import Flask
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from dotenv import load_dotenv
 
+
+load_dotenv()
 
 db = SQLAlchemy()
+migrate = Migrate()
 
 
-def create_app():
+def create_app(config_class=None):
     app = Flask(__name__)
 
-    app.config["SECRET_KEY"] = os.getenv(
-        "SECRET_KEY",
-        "dev-only-change-me"
-    )
+    if config_class is None:
+        config_class = os.getenv(
+            "FLASK_CONFIG",
+            "app.config.Config",
+        )
 
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-        "DATABASE_URL",
-        "sqlite:///atlaserp_dev.db"
-    )
-
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config.from_object(config_class)
 
     db.init_app(app)
+    migrate.init_app(app, db)
 
     from app import models
     from app.routes import main
 
     app.register_blueprint(main)
-
-    with app.app_context():
-        db.create_all()
 
     return app
