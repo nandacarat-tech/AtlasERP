@@ -3,7 +3,9 @@
 from app import db
 from app.customer_models import Customer
 from app.models import Product
+from decimal import Decimal
 
+from app.sale_models import Sale, SaleItem
 
 main = Blueprint("main", __name__)
 
@@ -243,3 +245,86 @@ def deactivate_customer(customer_id):
     db.session.commit()
 
     return jsonify(customer_to_dict(customer))
+
+@main.post("/sales")
+def create_sale():
+    data = request.get_json(silent=True) or {}
+
+    customer_id = data.get("customer_id")
+    items_data = data.get("items")
+
+    if not customer_id:
+        return jsonify({"error": "customer_id is required"}), 400
+
+    if not isinstance(items_data, list) or not items_data:
+        return jsonify({
+            "error": "items must be a non-empty list"
+        }), 400
+
+    customer = db.session.get(Customer, customer_id)
+
+    if customer is None:
+        return jsonify({"error": "customer not found"}), 404
+
+    if not customer.is_active:
+        return jsonify({"error": "customer is inactive"}), 400
+
+    sale = Sale(
+        customer=customer,
+        status="OPEN",
+        total_amount=Decimal("0.00"),
+    )
+
+    for item_data in items_data:
+        product_id = item_data.get("product_id")
+        quantity = item_data.get("quantity")
+
+        if not product_id or not isinstance(quantity, int):
+            return jsonify({
+                "error": "product_id and integer quantity are required"
+            }), 400
+
+        if quantity <= 0:
+            return jsonify({
+                "error": "quantity must be greater than zero"
+            }), 400
+
+        product = db.session.get(Product, product_id)
+
+        if product is None:
+            return jsonify({"error": "product not found"}), 404
+
+        if not product.is_active:
+            return jsonify({"error": "product is inactive"}), 400
+
+        if quantity > product.stock_quantity:
+            return jsonify({
+                "error": f"insufficient stock for product {product.sku}"
+            }), 400
+
+        sale.items.append(SaleItem(
+            product=product,
+            quantity=quantity,
+            unit_price=product.price,
+        ))
+
+    sale.recalculate_total()
+
+    db.session.add(sale)
+    db.session.commit()
+
+    return jsonify({
+        "id": sale.id,
+        "customer_id": sale.customer_id,
+        "status": sale.status,
+        "total_amount": str(sale.total_amount),
+        "items": [
+            {
+                "product_id": item.product_id,
+                "quantity": item.quantity,
+                "unit_price": str(item.unit_price),
+                "subtotal": str(item.subtotal),
+            }
+            for item in sale.items
+        ],
+    }), 201
