@@ -258,3 +258,62 @@ def test_create_sale_rejects_inactive_customer(client, app):
 
     assert response.status_code == 400
     assert response.get_json()["error"] == "customer is inactive"
+
+def test_create_sale_does_not_change_stock_when_one_item_is_insufficient(
+    client, app
+):
+    with app.app_context():
+        customer = Customer(
+            document="98765432100",
+            name="Cliente atomicidade",
+        )
+
+        first_product = Product(
+            sku="SKU-ATOMIC-001",
+            name="Primeiro produto",
+            price=Decimal("10.00"),
+            stock_quantity=5,
+        )
+
+        second_product = Product(
+            sku="SKU-ATOMIC-002",
+            name="Segundo produto",
+            price=Decimal("20.00"),
+            stock_quantity=1,
+        )
+
+        db.session.add_all([customer, first_product, second_product])
+        db.session.commit()
+
+        customer_id = customer.id
+        first_product_id = first_product.id
+        second_product_id = second_product.id
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": first_product_id,
+                    "quantity": 2,
+                },
+                {
+                    "product_id": second_product_id,
+                    "quantity": 2,
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 400
+    assert "insufficient stock" in response.get_json()["error"]
+
+    with app.app_context():
+        first_product = db.session.get(Product, first_product_id)
+        second_product = db.session.get(Product, second_product_id)
+
+        assert first_product.stock_quantity == 5
+        assert second_product.stock_quantity == 1
+        assert Sale.query.count() == 0
+
