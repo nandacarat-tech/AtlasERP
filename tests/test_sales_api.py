@@ -419,13 +419,15 @@ def test_get_sale_returns_items_and_totals(client, app):
         db.session.commit()
 
         sale = Sale(
-            customer=customer,
+            customer_id=customer.id,
             status="OPEN",
             total_amount=Decimal("25.00"),
         )
+        db.session.add(sale)
+
         sale.items.append(
             SaleItem(
-                product=product,
+                product_id=product.id,
                 quantity=2,
                 unit_price=product.price,
             )
