@@ -3,7 +3,7 @@
 from app import db
 from app.customer_models import Customer
 from app.models import Product
-from app.sale_models import Sale
+from app.sale_models import Sale, SaleItem
 
 def create_sale_data():
     customer = Customer(
@@ -400,3 +400,58 @@ def test_create_sale_with_multiple_items_updates_total_and_stock(client, app):
         assert sale is not None
         assert sale.total_amount == Decimal("45.00")
         assert len(sale.items) == 2
+
+def test_get_sale_returns_items_and_totals(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="77777777777",
+            name="Cliente consulta venda",
+        )
+
+        product = Product(
+            sku="SKU-GET-SALE-001",
+            name="Produto consulta venda",
+            price=Decimal("12.50"),
+            stock_quantity=10,
+        )
+
+        db.session.add_all([customer, product])
+        db.session.commit()
+
+        sale = Sale(
+            customer=customer,
+            status="OPEN",
+            total_amount=Decimal("25.00"),
+        )
+        sale.items.append(
+            SaleItem(
+                product=product,
+                quantity=2,
+                unit_price=product.price,
+            )
+        )
+        db.session.add(sale)
+        db.session.commit()
+
+        sale_id = sale.id
+        product_id = product.id
+        customer_id = customer.id
+
+    response = client.get(f"/sales/{sale_id}")
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert data["id"] == sale_id
+    assert data["customer_id"] == customer_id
+    assert data["status"] == "OPEN"
+    assert data["total_amount"] == "25.00"
+    assert data["items"] == [
+        {
+            "product_id": product_id,
+            "quantity": 2,
+            "unit_price": "12.50",
+            "subtotal": "25.00",
+        }
+    ]
