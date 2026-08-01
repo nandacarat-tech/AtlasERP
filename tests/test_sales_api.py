@@ -487,3 +487,59 @@ def test_failed_sale_creation_does_not_persist_sale(client, app):
 
     with app.app_context():
         assert db.session.query(Sale).count() == initial_sales_count
+
+def test_failed_multi_item_sale_does_not_change_stock_or_persist_sale(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="11111111111",
+            name="Cliente rollback múltiplo",
+        )
+
+        first_product = Product(
+            sku="SKU-ROLLBACK-001",
+            name="Produto rollback 1",
+            price=Decimal("10.00"),
+            stock_quantity=5,
+        )
+
+        second_product = Product(
+            sku="SKU-ROLLBACK-002",
+            name="Produto rollback 2",
+            price=Decimal("20.00"),
+            stock_quantity=1,
+        )
+
+        db.session.add_all([customer, first_product, second_product])
+        db.session.commit()
+
+        customer_id = customer.id
+        first_product_id = first_product.id
+        second_product_id = second_product.id
+        initial_sales_count = db.session.query(Sale).count()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": first_product_id,
+                    "quantity": 2,
+                },
+                {
+                    "product_id": second_product_id,
+                    "quantity": 2,
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 400
+
+    with app.app_context():
+        first_product = db.session.get(Product, first_product_id)
+        second_product = db.session.get(Product, second_product_id)
+
+        assert first_product.stock_quantity == 5
+        assert second_product.stock_quantity == 1
+        assert db.session.query(Sale).count() == initial_sales_count
