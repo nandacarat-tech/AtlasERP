@@ -457,3 +457,33 @@ def test_get_sale_returns_items_and_totals(client, app):
             "subtotal": "25.00",
         }
     ]
+
+def test_failed_sale_creation_does_not_persist_sale(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="99999999999",
+            name="Cliente falha de venda",
+        )
+        db.session.add(customer)
+        db.session.commit()
+
+        customer_id = customer.id
+        initial_sales_count = db.session.query(Sale).count()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": 999999,
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 404
+
+    with app.app_context():
+        assert db.session.query(Sale).count() == initial_sales_count
