@@ -543,3 +543,48 @@ def test_failed_multi_item_sale_does_not_change_stock_or_persist_sale(client, ap
         assert first_product.stock_quantity == 5
         assert second_product.stock_quantity == 1
         assert db.session.query(Sale).count() == initial_sales_count
+
+def test_create_sale_rejects_duplicate_product_items(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="22222222222",
+            name="Cliente produto duplicado",
+        )
+        product = Product(
+            sku="SKU-DUPLICADO-001",
+            name="Produto duplicado",
+            price=Decimal("10.00"),
+            stock_quantity=10,
+        )
+
+        db.session.add_all([customer, product])
+        db.session.commit()
+
+        customer_id = customer.id
+        product_id = product.id
+        initial_sales_count = db.session.query(Sale).count()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": 1,
+                },
+                {
+                    "product_id": product_id,
+                    "quantity": 2,
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 400
+
+    with app.app_context():
+        product = db.session.get(Product, product_id)
+
+        assert product.stock_quantity == 10
+        assert db.session.query(Sale).count() == initial_sales_count

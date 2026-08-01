@@ -305,6 +305,13 @@ def create_sale():
             "error": "items must be a non-empty list"
         }), 400
 
+    product_ids = [item.get("product_id") for item in items_data]
+
+    if len(product_ids) != len(set(product_ids)):
+        return jsonify({
+            "error": "duplicate products are not allowed"
+        }), 400
+
     customer = db.session.get(Customer, customer_id)
 
     if customer is None:
