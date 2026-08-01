@@ -208,3 +208,31 @@ def test_cancel_sale_cannot_be_cancelled_twice(client, app):
 
         assert product.stock_quantity == 10
         assert sale.status == "CANCELLED"
+
+def test_cancel_empty_sale_is_allowed_without_stock_change(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="88888888888",
+            name="Cliente venda vazia",
+        )
+        db.session.add(customer)
+        db.session.commit()
+
+        sale = Sale(
+            customer_id=customer.id,
+            status="OPEN",
+            total_amount=Decimal("0.00"),
+        )
+        db.session.add(sale)
+        db.session.commit()
+
+        sale_id = sale.id
+
+    response = client.post(f"/sales/{sale_id}/cancel")
+
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "CANCELLED"
+
+    with app.app_context():
+        sale = db.session.get(Sale, sale_id)
+        assert sale.status == "CANCELLED"
