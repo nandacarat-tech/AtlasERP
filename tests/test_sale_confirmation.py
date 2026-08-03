@@ -272,3 +272,49 @@ def test_confirm_sale_cannot_be_confirmed_twice(client, app):
 
         assert product.stock_quantity == 8
         assert sale.status == "CONFIRMED"
+
+
+def test_confirm_sale_does_not_allow_stock_to_become_negative(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="99999999999",
+            name="Cliente concorrência",
+        )
+        product = Product(
+            sku="SKU-CONCURRENCY-001",
+            name="Produto concorrência",
+            price=Decimal("10.00"),
+            stock_quantity=1,
+        )
+
+        db.session.add_all([customer, product])
+        db.session.commit()
+
+        sale = Sale(
+            customer_id=customer.id,
+            status="OPEN",
+            total_amount=Decimal("10.00"),
+        )
+        sale.items.append(
+            SaleItem(
+                product=product,
+                quantity=1,
+                unit_price=product.price,
+            )
+        )
+
+        db.session.add(sale)
+        db.session.commit()
+
+        product_id = product.id
+        sale_id = sale.id
+
+    response = client.post(f"/sales/{sale_id}/confirm")
+
+    assert response.status_code == 200
+
+    with app.app_context():
+        product = db.session.get(Product, product_id)
+
+        assert product.stock_quantity == 0
+        assert product.stock_quantity >= 0

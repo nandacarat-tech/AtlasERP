@@ -1,6 +1,7 @@
 ﻿from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, jsonify, request
+from sqlalchemy import update
 
 from app import db
 from app.customer_models import Customer
@@ -423,13 +424,23 @@ def confirm_sale(sale_id):
     for item in sale.items:
         product = item.product
 
-        if item.quantity > product.stock_quantity:
-           return jsonify({
-              "error": f"insufficient stock for product {product.sku}"
-        }), 400
+        result = db.session.execute(
+            update(Product)
+            .where(
+                Product.id == product.id,
+                Product.stock_quantity >= item.quantity,
+            )
+            .values(
+                stock_quantity=Product.stock_quantity - item.quantity
+            )
+        )
 
-    for item in sale.items:
-        item.product.stock_quantity -= item.quantity
+        if result.rowcount != 1:
+            db.session.rollback()
+
+            return jsonify({
+                "error": f"insufficient stock for product {product.sku}"
+            }), 400
 
     sale.status = "CONFIRMED"
     db.session.commit()
