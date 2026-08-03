@@ -588,3 +588,48 @@ def test_create_sale_rejects_duplicate_product_items(client, app):
 
         assert product.stock_quantity == 10
         assert db.session.query(Sale).count() == initial_sales_count
+
+def test_invalid_item_after_valid_item_does_not_persist_sale(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="33333333333",
+            name="Cliente validação completa",
+        )
+        product = Product(
+            sku="SKU-VALIDACAO-001",
+            name="Produto validação",
+            price=Decimal("15.00"),
+            stock_quantity=10,
+        )
+
+        db.session.add_all([customer, product])
+        db.session.commit()
+
+        customer_id = customer.id
+        product_id = product.id
+        initial_sales_count = db.session.query(Sale).count()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": 2,
+                },
+                {
+                    "product_id": product_id + 999999,
+                    "quantity": 1,
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 404
+
+    with app.app_context():
+        product = db.session.get(Product, product_id)
+
+        assert product.stock_quantity == 10
+        assert db.session.query(Sale).count() == initial_sales_count
