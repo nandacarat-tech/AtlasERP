@@ -7,6 +7,7 @@ from app import db
 from app.customer_models import Customer
 from app.models import Product
 from app.sale_models import Sale, SaleItem
+from app.sale_status import CANCELLED, CONFIRMED, OPEN
 
 
 main = Blueprint("main", __name__)
@@ -362,7 +363,7 @@ def create_sale():
 
     sale = Sale(
         customer=customer,
-        status="OPEN",
+        status=OPEN,
         total_amount=Decimal("0.00"),
     )
 
@@ -416,7 +417,7 @@ def get_sale(sale_id):
 def confirm_sale(sale_id):
     sale = db.get_or_404(Sale, sale_id)
 
-    if sale.status != "OPEN":
+    if sale.status != OPEN:
         return jsonify({
             "error": "only open sales can be confirmed"
         }), 400
@@ -442,7 +443,7 @@ def confirm_sale(sale_id):
                 "error": f"insufficient stock for product {product.sku}"
             }), 400
 
-    sale.status = "CONFIRMED"
+    sale.status = CONFIRMED
     db.session.commit()
 
     return jsonify(sale_to_dict(sale))
@@ -455,10 +456,10 @@ def cancel_sale(sale_id):
     if sale is None:
         return jsonify({"error": "sale not found"}), 404
 
-    if sale.status != "OPEN":
+    if sale.status != OPEN:
         return jsonify({"error": "only open sales can be cancelled"}), 400
 
-    sale.status = "CANCELLED"
+    sale.status = CANCELLED
     db.session.commit()
 
     return jsonify({
