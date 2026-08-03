@@ -318,3 +318,67 @@ def test_confirm_sale_does_not_allow_stock_to_become_negative(client, app):
 
         assert product.stock_quantity == 0
         assert product.stock_quantity >= 0
+
+
+def test_confirm_multi_item_sale_rolls_back_stock_on_failure(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="88888888888",
+            name="Cliente rollback confirmação",
+        )
+        first_product = Product(
+            sku="SKU-ROLLBACK-001",
+            name="Produto rollback 1",
+            price=Decimal("10.00"),
+            stock_quantity=5,
+        )
+        second_product = Product(
+            sku="SKU-ROLLBACK-002",
+            name="Produto rollback 2",
+            price=Decimal("20.00"),
+            stock_quantity=1,
+        )
+
+        db.session.add_all([customer, first_product, second_product])
+        db.session.commit()
+
+        sale = Sale(
+            customer_id=customer.id,
+            status="OPEN",
+            total_amount=Decimal("50.00"),
+        )
+        sale.items.extend(
+            [
+                SaleItem(
+                    product=first_product,
+                    quantity=2,
+                    unit_price=first_product.price,
+                ),
+                SaleItem(
+                    product=second_product,
+                    quantity=2,
+                    unit_price=second_product.price,
+                ),
+            ]
+        )
+
+        db.session.add(sale)
+        db.session.commit()
+
+        sale_id = sale.id
+        first_product_id = first_product.id
+        second_product_id = second_product.id
+
+    response = client.post(f"/sales/{sale_id}/confirm")
+
+    assert response.status_code == 400
+    assert "insufficient stock" in response.get_json()["error"]
+
+    with app.app_context():
+        saved_sale = db.session.get(Sale, sale_id)
+        saved_first_product = db.session.get(Product, first_product_id)
+        saved_second_product = db.session.get(Product, second_product_id)
+
+        assert saved_sale.status == "OPEN"
+        assert saved_first_product.stock_quantity == 5
+        assert saved_second_product.stock_quantity == 1
