@@ -324,13 +324,7 @@ def create_sale():
             "error": "customer is inactive"
         }), 400
 
-    sale = Sale(
-        customer=customer,
-        status="OPEN",
-        total_amount=Decimal("0.00"),
-    )
-
-    db.session.add(sale)
+    validated_items = []
 
     for item_data in items_data:
         product_id = item_data.get("product_id")
@@ -350,7 +344,7 @@ def create_sale():
 
         if product is None:
             return jsonify({
- "error": "product not found"
+                "error": "product not found"
             }), 404
 
         if not product.is_active:
@@ -360,9 +354,18 @@ def create_sale():
 
         if quantity > product.stock_quantity:
             return jsonify({
-               "error": f"insufficient stock for product {product.sku}"
+                "error": f"insufficient stock for product {product.sku}"
             }), 400
 
+        validated_items.append((product, quantity))
+
+    sale = Sale(
+        customer=customer,
+        status="OPEN",
+        total_amount=Decimal("0.00"),
+    )
+
+    for product, quantity in validated_items:
         sale.items.append(SaleItem(
             product=product,
             quantity=quantity,
@@ -371,10 +374,10 @@ def create_sale():
 
     sale.recalculate_total()
 
+    db.session.add(sale)
     db.session.commit()
 
     return jsonify(sale_to_dict(sale)), 201
-
 
 @main.get("/sales")
 def list_sales():
@@ -432,6 +435,8 @@ def confirm_sale(sale_id):
     db.session.commit()
 
     return jsonify(sale_to_dict(sale))
+
+
 @main.post("/sales/<int:sale_id>/cancel")
 def cancel_sale(sale_id):
     sale = db.session.get(Sale, sale_id)
