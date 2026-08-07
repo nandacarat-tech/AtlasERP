@@ -702,3 +702,9 @@ def test_list_sales_filters_by_status_and_customer(client, app):
     assert data[0]["id"] == sale_id
     assert data[0]["customer_id"] == customer_id
     assert data[0]["status"] == "CONFIRMED"
+
+def test_list_sales_returns_empty_for_unknown_customer(client):
+    response = client.get("/sales?customer_id=999999")
+
+    assert response.status_code == 200
+    assert response.get_json() == []
