@@ -838,3 +838,28 @@ def test_list_sales_paginated_returns_empty_page(client, app):
     assert data["total"] == 1
     assert data["pages"] == 1
     assert data["items"] == []
+
+import pytest
+
+@pytest.mark.parametrize(
+    "parameter",
+    ["page", "per_page"],
+)
+def test_list_sales_paginated_rejects_non_integer_parameters(
+    client,
+    parameter,
+):
+    response = client.get(f"/sales/paginated?{parameter}=1.5")
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == (
+        "page and per_page must be integers"
+    )
+
+def test_list_sales_paginated_rejects_empty_page_parameter(client):
+    response = client.get("/sales/paginated?page=")
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == (
+        "page and per_page must be integers"
+    )
