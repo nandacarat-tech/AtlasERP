@@ -655,18 +655,6 @@ def test_list_sales_rejects_negative_customer_id(client):
     assert response.status_code == 400
     assert response.get_json()["error"] == "customer_id must be positive"
 
-def test_list_sales_rejects_zero_customer_id(client):
-    response = client.get("/sales?customer_id=0")
-
-    assert response.status_code == 400
-    assert response.get_json()["error"] == "customer_id must be positive"
-
-
-def test_list_sales_rejects_negative_customer_id(client):
-    response = client.get("/sales?customer_id=-1")
-
-    assert response.status_code == 400
-    assert response.get_json()["error"] == "customer_id must be positive"
 
 def test_list_sales_filters_by_status_and_customer(client, app):
     with app.app_context():
