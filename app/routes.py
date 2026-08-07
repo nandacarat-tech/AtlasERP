@@ -404,12 +404,15 @@ def list_sales():
             customer_id = int(customer_id)
         except ValueError:
             return jsonify({
-                "error": "customer_id must be an"
+                "error": "customer_id must be an integer"
             }), 400
 
-        query = query.filter_by(customer_id=customer_id)
+        if customer_id <= 0:
+            return jsonify({
+                "error": "customer_id must be positive"
+            }), 400
 
-    sales = query.all()
+    query = query.filter_by(customer_id=customer_id)
 
     return jsonify([sale_to_dict(sale) for sale in sales])
 
