@@ -4,6 +4,7 @@ from app import db
 from app.customer_models import Customer
 from app.models import Product
 from app.sale_models import Sale, SaleItem
+from app.sale_status import CANCELLED, CONFIRMED
 
 
 def create_open_sale():
@@ -382,3 +383,46 @@ def test_confirm_multi_item_sale_rolls_back_stock_on_failure(client, app):
         assert saved_sale.status == "OPEN"
         assert saved_first_product.stock_quantity == 5
         assert saved_second_product.stock_quantity == 1
+
+def test_confirm_sale_rejects_cancelled_sale(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="77777777777",
+            name="Cliente venda cancelada",
+        )
+        sale = Sale(
+            customer=customer,
+            status=CANCELLED,
+            total_amount=Decimal("0.00"),
+        )
+
+        db.session.add(sale)
+        db.session.commit()
+        sale_id = sale.id
+
+    response = client.post(f"/sales/{sale_id}/confirm")
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "only open sales can be confirmed"
+
+
+def test_cancel_sale_rejects_confirmed_sale(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="66666666666",
+            name="Cliente venda confirmada",
+        )
+        sale = Sale(
+            customer=customer,
+            status=CONFIRMED,
+            total_amount=Decimal("0.00"),
+        )
+
+        db.session.add(sale)
+        db.session.commit()
+        sale_id = sale.id
+
+    response = client.post(f"/sales/{sale_id}/cancel")
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "only open sales can be cancelled"
