@@ -667,3 +667,38 @@ def test_list_sales_rejects_negative_customer_id(client):
 
     assert response.status_code == 400
     assert response.get_json()["error"] == "customer_id must be positive"
+
+def test_list_sales_filters_by_status_and_customer(client, app):
+    with app.app_context():
+        customer_id, product_id = create_sale_data()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+    sale_id = response.get_json()["id"]
+
+    confirmed_response = client.post(f"/sales/{sale_id}/confirm")
+    assert confirmed_response.status_code == 200
+
+    response = client.get(
+        f"/sales?status=CONFIRMED&customer_id={customer_id}"
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()
+
+    assert len(data) == 1
+    assert data[0]["id"] == sale_id
+    assert data[0]["customer_id"] == customer_id
+    assert data[0]["status"] == "CONFIRMED"

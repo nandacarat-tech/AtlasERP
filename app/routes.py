@@ -412,10 +412,11 @@ def list_sales():
                 "error": "customer_id must be positive"
             }), 400
 
-    query = query.filter_by(customer_id=customer_id)
+        query = query.filter_by(customer_id=customer_id)
+
+    sales = query.all()
 
     return jsonify([sale_to_dict(sale) for sale in sales])
-
 
 @main.get("/sales/<int:sale_id>")
 def get_sale(sale_id):
