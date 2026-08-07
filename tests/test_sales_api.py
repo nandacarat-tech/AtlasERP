@@ -708,3 +708,10 @@ def test_list_sales_returns_empty_for_unknown_customer(client):
 
     assert response.status_code == 200
     assert response.get_json() == []
+
+def test_list_sales_accepts_valid_status_values(client):
+    for status in ("OPEN", "CONFIRMED", "CANCELLED"):
+        response = client.get(f"/sales?status={status}")
+
+        assert response.status_code == 200
+        assert isinstance(response.get_json(), list)
