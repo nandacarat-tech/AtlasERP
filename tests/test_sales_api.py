@@ -807,3 +807,34 @@ def test_list_sales_paginated_applies_status_and_customer_filters(client, app):
     assert len(data["items"]) == 1
     assert data["items"][0]["id"] == sale_id
     assert data["items"][0]["status"] == "CONFIRMED"
+
+def test_list_sales_paginated_returns_empty_page(client, app):
+    with app.app_context():
+        customer_id, product_id = create_sale_data()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+
+    response = client.get("/sales/paginated?page=2&per_page=10")
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert data["page"] == 2
+    assert data["per_page"] == 10
+    assert data["total"] == 1
+    assert data["pages"] == 1
+    assert data["items"] == []
