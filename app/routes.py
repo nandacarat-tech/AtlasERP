@@ -7,7 +7,12 @@ from app import db
 from app.customer_models import Customer
 from app.models import Product
 from app.sale_models import Sale, SaleItem
-from app.sale_status import CANCELLED, CONFIRMED, OPEN
+from app.sale_status import (
+    CANCELLED,
+    CONFIRMED,
+    OPEN,
+    SALE_STATUSES,
+)
 
 
 main = Blueprint("main", __name__)
@@ -387,6 +392,9 @@ def list_sales():
 
     status = request.args.get("status")
     customer_id = request.args.get("customer_id")
+
+    if status and status not in SALE_STATUSES:
+        return jsonify({"error": "invalid sale status"}), 400
 
     if status:
         query = query.filter_by(status=status)

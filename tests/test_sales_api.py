@@ -4,6 +4,8 @@ from app import db
 from app.customer_models import Customer
 from app.models import Product
 from app.sale_models import Sale, SaleItem
+from app.sale_status import CANCELLED, CONFIRMED, OPEN
+
 
 def create_sale_data():
     customer = Customer(
@@ -633,3 +635,9 @@ def test_invalid_item_after_valid_item_does_not_persist_sale(client, app):
 
         assert product.stock_quantity == 10
         assert db.session.query(Sale).count() == initial_sales_count
+
+def test_list_sales_rejects_unknown_status(client):
+    response = client.get("/sales?status=INVALID")
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "invalid sale status"
