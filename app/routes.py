@@ -418,6 +418,70 @@ def list_sales():
 
     return jsonify([sale_to_dict(sale) for sale in sales])
 
+
+@main.get("/sales/paginated")
+def list_sales_paginated():
+    query = Sale.query.order_by(Sale.id)
+
+    status = request.args.get("status")
+    customer_id = request.args.get("customer_id")
+
+    if status and status not in SALE_STATUSES:
+        return jsonify({"error": "invalid sale status"}), 400
+
+    if status:
+        query = query.filter_by(status=status)
+
+    if customer_id:
+        try:
+            customer_id = int(customer_id)
+        except ValueError:
+            return jsonify({
+                "error": "customer_id must be an integer"
+            }), 400
+
+        if customer_id <= 0:
+            return jsonify({
+                "error": "customer_id must be positive"
+            }), 400
+
+        query = query.filter_by(customer_id=customer_id)
+
+    try:
+        page = int(request.args.get("page", 1))
+        per_page = int(request.args.get("per_page", 10))
+    except ValueError:
+        return jsonify({
+            "error": "page and per_page must be integers"
+        }), 400
+
+    if page <= 0:
+        return jsonify({
+            "error": "page must be positive"
+        }), 400
+
+    if per_page <= 0:
+        return jsonify({
+            "error": "per_page must be positive"
+        }), 400
+
+    if per_page > 100:
+        return jsonify({
+            "error": "per_page cannot be greater than 100"
+        }), 400
+
+    total = query.count()
+    sales = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    return jsonify({
+        "items": [sale_to_dict(sale) for sale in sales],
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "pages": (total + per_page - 1) // per_page,
+    })
+
+
 @main.get("/sales/<int:sale_id>")
 def get_sale(sale_id):
     sale = db.get_or_404(Sale, sale_id)

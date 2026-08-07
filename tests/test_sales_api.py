@@ -703,3 +703,68 @@ def test_list_sales_accepts_valid_status_values(client):
 
         assert response.status_code == 200
         assert isinstance(response.get_json(), list)
+
+def test_list_sales_paginated_returns_metadata(client):
+    response = client.get("/sales/paginated")
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert data["page"] == 1
+    assert data["per_page"] == 10
+    assert data["total"] == 0
+    assert data["pages"] == 0
+    assert data["items"] == []
+
+
+def test_list_sales_paginated_rejects_invalid_page(client):
+    response = client.get("/sales/paginated?page=0")
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "page must be positive"
+
+
+def test_list_sales_paginated_rejects_invalid_per_page(client):
+    response = client.get("/sales/paginated?per_page=101")
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == (
+        "per_page cannot be greater than 100"
+    )
+
+def test_list_sales_paginated_splits_results(client, app):
+    with app.app_context():
+        customer_id, product_id = create_sale_data()
+
+    sale_ids = []
+
+    for _ in range(3):
+        response = client.post(
+            "/sales",
+            json={
+                "customer_id": customer_id,
+                "items": [
+                    {
+                        "product_id": product_id,
+                        "quantity": 1,
+                    }
+                ],
+            },
+        )
+
+        assert response.status_code == 201
+        sale_ids.append(response.get_json()["id"])
+
+    response = client.get("/sales/paginated?page=2&per_page=2")
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert data["page"] == 2
+    assert data["per_page"] == 2
+    assert data["total"] == 3
+    assert data["pages"] == 2
+    assert len(data["items"]) == 1
+    assert data["items"][0]["id"] == sale_ids[2]
