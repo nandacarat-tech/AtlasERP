@@ -768,3 +768,42 @@ def test_list_sales_paginated_splits_results(client, app):
     assert data["pages"] == 2
     assert len(data["items"]) == 1
     assert data["items"][0]["id"] == sale_ids[2]
+
+def test_list_sales_paginated_applies_status_and_customer_filters(client, app):
+    with app.app_context():
+        customer_id, product_id = create_sale_data()
+
+    response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+    sale_id = response.get_json()["id"]
+
+    response = client.post(f"/sales/{sale_id}/confirm")
+    assert response.status_code == 200
+
+    response = client.get(
+        "/sales/paginated"
+        f"?status=CONFIRMED&customer_id={customer_id}"
+        "&page=1&per_page=10"
+    )
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert data["total"] == 1
+    assert data["pages"] == 1
+    assert len(data["items"]) == 1
+    assert data["items"][0]["id"] == sale_id
+    assert data["items"][0]["status"] == "CONFIRMED"
