@@ -585,3 +585,33 @@ def test_confirm_sale_is_atomic_when_one_item_lacks_stock(client, app):
         assert product_ok.stock_quantity == 10
         assert product_without_stock.stock_quantity == 1
         assert movements == []
+
+def test_confirm_sale_cannot_be_confirmed_twice(
+    client,
+    app,
+):
+    with app.app_context():
+        sale_id, product_id = create_open_sale()
+
+    first_response = client.post(
+        f"/sales/{sale_id}/confirm"
+    )
+    second_response = client.post(
+        f"/sales/{sale_id}/confirm"
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 400
+
+    with app.app_context():
+        movements = db.session.scalars(
+            db.select(StockMovement).where(
+                StockMovement.sale_id == sale_id
+            )
+        ).all()
+
+        product = db.session.get(Product, product_id)
+
+        assert len(movements) == 1
+        assert movements[0].movement_type == "OUT"
+        assert product.stock_quantity == 8
