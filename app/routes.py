@@ -385,6 +385,77 @@ def create_sale():
     db.session.commit()
 
     return jsonify(sale_to_dict(sale)), 201
+def apply_sale_filters(query):
+    status = request.args.get("status")
+    customer_id = request.args.get("customer_id")
+
+    if status and status not in SALE_STATUSES:
+        return None, (
+            jsonify({"error": "invalid sale status"}),
+            400,
+        )
+
+    if status:
+        query = query.filter_by(status=status)
+
+    if customer_id:
+        try:
+            customer_id = int(customer_id)
+        except ValueError:
+            return None, (
+                jsonify({
+                    "error": "customer_id must be an integer"
+                }),
+                400,
+            )
+
+        if customer_id <= 0:
+            return None, (
+                jsonify({
+                    "error": "customer_id must be positive"
+                }),
+                400,
+            )
+
+        query = query.filter_by(customer_id=customer_id)
+
+    return query, None
+
+
+def parse_pagination_params():
+    try:
+        page = int(request.args.get("page", 1))
+        per_page = int(request.args.get("per_page", 10))
+    except (TypeError, ValueError):
+        return None, None, (
+            jsonify({
+                "error": "page and per_page must be integers"
+            }),
+            400,
+        )
+
+    if page <= 0:
+        return None, None, (
+            jsonify({"error": "page must be positive"}),
+            400,
+        )
+
+    if per_page <= 0:
+        return None, None, (
+            jsonify({"error": "per_page must be positive"}),
+            400,
+        )
+
+    if per_page > 100:
+        return None, None, (
+            jsonify({
+                "error": "per_page cannot be greater than 100"
+            }),
+            400,
+        )
+
+    return page, per_page, None
+
 
 @main.get("/sales")
 def list_sales():
