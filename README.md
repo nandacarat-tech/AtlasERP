@@ -191,3 +191,40 @@ A rota `/sales` não foi alterada para preservar compatibilidade com consumidore
 - [Arquitetura](docs/architecture.md)
 - [API](docs/api.md)
 
+## Histórico de movimentações de estoque
+
+Para consultar as movimentações de um produto:
+
+```http
+GET /products/<product_id>/stock-movements
+```
+
+Exemplo:
+
+```http
+GET /products/1/stock-movements
+```
+
+Resposta:
+
+```json
+[
+  {
+    "id": 1,
+    "product_id": 1,
+    "sale_id": 1,
+    "movement_type": "OUT",
+    "quantity": 2,
+    "stock_before": 10,
+    "stock_after": 8,
+    "created_at": "2026-08-12T17:36:00+00:00"
+  }
+]
+```
+
+Tipos de movimentação:
+
+- `IN`: entrada de estoque;
+- `OUT`: saída de estoque.
+
+A confirmação de uma venda gera uma movimentação `OUT` para cada item vendido.

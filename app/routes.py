@@ -13,6 +13,8 @@ from app.sale_status import (
     OPEN,
     SALE_STATUSES,
 )
+from app.stock_movement_models import StockMovement
+
 
 
 main = Blueprint("main", __name__)
@@ -571,6 +573,7 @@ def confirm_sale(sale_id):
 
     for item in sale.items:
         product = item.product
+        stock_before = product.stock_quantity
 
         result = db.session.execute(
             update(Product)
@@ -590,6 +593,15 @@ def confirm_sale(sale_id):
                 "error": f"insufficient stock for product {product.sku}"
             }), 400
 
+        db.session.add(StockMovement(
+            product_id=product.id,
+            sale_id=sale.id,
+            movement_type="OUT",
+            quantity=item.quantity,
+            stock_before=stock_before,
+            stock_after=stock_before - item.quantity,
+        ))
+
     sale.status = CONFIRMED
     db.session.commit()
 
@@ -604,7 +616,9 @@ def cancel_sale(sale_id):
         return jsonify({"error": "sale not found"}), 404
 
     if sale.status != OPEN:
-        return jsonify({"error": "only open sales can be cancelled"}), 400
+        return jsonify({
+            "error": "only open sales can be cancelled"
+        }), 400
 
     sale.status = CANCELLED
     db.session.commit()
@@ -614,3 +628,30 @@ def cancel_sale(sale_id):
         "status": sale.status,
         "total_amount": str(sale.total_amount),
     }), 200
+
+@main.get("/products/<int:product_id>/stock-movements")
+def list_stock_movements(product_id):
+    product = db.session.get(Product, product_id)
+
+    if product is None:
+        return jsonify({"error": "product not found"}), 404
+
+    movements = db.session.scalars(
+        db.select(StockMovement)
+        .where(StockMovement.product_id == product_id)
+        .order_by(StockMovement.created_at, StockMovement.id)
+    ).all()
+
+    return jsonify([
+        {
+            "id": movement.id,
+            "product_id": movement.product_id,
+            "sale_id": movement.sale_id,
+            "movement_type": movement.movement_type,
+            "quantity": movement.quantity,
+            "stock_before": movement.stock_before,
+            "stock_after": movement.stock_after,
+            "created_at": movement.created_at.isoformat(),
+        }
+        for movement in movements
+    ])

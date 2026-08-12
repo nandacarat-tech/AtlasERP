@@ -5,7 +5,8 @@ from app.customer_models import Customer
 from app.models import Product
 from app.sale_models import Sale, SaleItem
 from app.sale_status import CANCELLED, CONFIRMED
-
+from app.stock_movement_models import StockMovement
+import pytest
 
 def create_open_sale():
     customer = Customer(
@@ -426,3 +427,220 @@ def test_cancel_sale_rejects_confirmed_sale(client, app):
 
     assert response.status_code == 400
     assert response.get_json()["error"] == "only open sales can be cancelled"
+
+def test_confirm_sale_creates_stock_movement(client, app):
+    with app.app_context():
+        sale_id, product_id = create_open_sale()
+
+    response = client.post(f"/sales/{sale_id}/confirm")
+
+    assert response.status_code == 200
+
+    with app.app_context():
+        movement = db.session.scalar(
+            db.select(StockMovement).where(
+                StockMovement.sale_id == sale_id
+            )
+        )
+
+        assert movement is not None
+        assert movement.product_id == product_id
+        assert movement.movement_type == "OUT"
+        assert movement.quantity == 2
+        assert movement.stock_before == 10
+        assert movement.stock_after == 8
+
+def test_list_stock_movements(client, app):
+    with app.app_context():
+        sale_id, product_id = create_open_sale()
+
+    confirm_response = client.post(f"/sales/{sale_id}/confirm")
+    assert confirm_response.status_code == 200
+
+    response = client.get(
+        f"/products/{product_id}/stock-movements"
+    )
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert len(data) == 1
+    assert data[0]["product_id"] == product_id
+    assert data[0]["sale_id"] == sale_id
+    assert data[0]["movement_type"] == "OUT"
+
+def test_list_stock_movements_returns_404_for_unknown_product(client):
+    response = client.get("/products/999999/stock-movements")
+
+    assert response.status_code == 404
+    assert response.get_json() == {
+        "error": "product not found"
+    }
+
+def test_list_stock_movements(client, app):
+    with app.app_context():
+        sale_id, product_id = create_open_sale()
+
+    confirm_response = client.post(f"/sales/{sale_id}/confirm")
+    assert confirm_response.status_code == 200
+
+    response = client.get(
+        f"/products/{product_id}/stock-movements"
+    )
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert len(data) == 1
+    assert data[0]["product_id"] == product_id
+    assert data[0]["sale_id"] == sale_id
+    assert data[0]["movement_type"] == "OUT"
+
+
+def test_list_stock_movements_returns_404_for_unknown_product(client):
+    response = client.get("/products/999999/stock-movements")
+
+    assert response.status_code == 404
+    assert response.get_json() == {
+        "error": "product not found"
+    }
+
+def test_confirm_sale_is_atomic_when_one_item_lacks_stock(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="77777777777",
+            name="Cliente atomicidade",
+        )
+
+        product_ok = Product(
+            sku="ATOMIC-OK",
+            name="Produto com estoque",
+            price=Decimal("10.00"),
+            stock_quantity=10,
+        )
+
+        product_without_stock = Product(
+            sku="ATOMIC-NOK",
+            name="Produto sem estoque suficiente",
+            price=Decimal("20.00"),
+            stock_quantity=1,
+        )
+
+        db.session.add_all([
+            customer,
+            product_ok,
+            product_without_stock,
+        ])
+        db.session.commit()
+
+        sale = Sale(
+            customer_id=customer.id,
+            status="OPEN",
+            total_amount=Decimal("50.00"),
+        )
+        db.session.add(sale)
+        db.session.commit()
+
+        db.session.add_all([
+            SaleItem(
+                sale_id=sale.id,
+                product_id=product_ok.id,
+                quantity=2,
+                unit_price=product_ok.price,
+            ),
+            SaleItem(
+                sale_id=sale.id,
+                product_id=product_without_stock.id,
+                quantity=2,
+                unit_price=product_without_stock.price,
+            ),
+        ])
+        db.session.commit()
+
+        sale_id = sale.id
+        product_ok_id = product_ok.id
+        product_without_stock_id = product_without_stock.id
+
+    response = client.post(f"/sales/{sale_id}/confirm")
+
+    assert response.status_code == 400
+
+    with app.app_context():
+        sale = db.session.get(Sale, sale_id)
+        product_ok = db.session.get(Product, product_ok_id)
+        product_without_stock = db.session.get(
+            Product,
+            product_without_stock_id,
+        )
+
+        movements = db.session.scalars(
+            db.select(StockMovement).where(
+                StockMovement.sale_id == sale_id
+            )
+        ).all()
+
+        assert sale.status == "OPEN"
+        assert product_ok.stock_quantity == 10
+        assert product_without_stock.stock_quantity == 1
+        assert movements == []
+
+def test_confirm_sale_cannot_be_confirmed_twice(
+    client,
+    app,
+):
+    with app.app_context():
+        sale_id, product_id = create_open_sale()
+
+    first_response = client.post(
+        f"/sales/{sale_id}/confirm"
+    )
+    second_response = client.post(
+        f"/sales/{sale_id}/confirm"
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 400
+
+    with app.app_context():
+        movements = db.session.scalars(
+            db.select(StockMovement).where(
+                StockMovement.sale_id == sale_id
+            )
+        ).all()
+
+        product = db.session.get(Product, product_id)
+
+        assert len(movements) == 1
+        assert movements[0].movement_type == "OUT"
+        assert product.stock_quantity == 8
+
+def test_stock_movement_rejects_invalid_type(app):
+    with app.app_context():
+        with pytest.raises(
+            ValueError,
+            match="movement_type",
+        ):
+            StockMovement(
+                product_id=1,
+                movement_type="INVALID",
+                quantity=1,
+                stock_before=0,
+                stock_after=1,
+            )
+
+
+def test_stock_movement_rejects_non_positive_quantity(app):
+    with app.app_context():
+        with pytest.raises(
+            ValueError,
+            match="quantity",
+        ):
+            StockMovement(
+                product_id=1,
+                movement_type="IN",
+                quantity=0,
+                stock_before=0,
+                stock_after=0,
+            )
