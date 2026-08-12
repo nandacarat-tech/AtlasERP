@@ -863,3 +863,55 @@ def test_list_sales_paginated_rejects_empty_page_parameter(client):
     assert response.get_json()["error"] == (
         "page and per_page must be integers"
     )
+
+def test_list_sales_paginated_does_not_mix_customers(client, app):
+    with app.app_context():
+        first_customer_id, first_product_id = create_sale_data()
+
+        second_customer = Customer(
+            document="88888888888",
+            name="Segundo cliente paginação",
+        )
+        db.session.add(second_customer)
+        db.session.commit()
+        second_customer_id = second_customer.id
+
+    first_response = client.post(
+        "/sales",
+        json={
+            "customer_id": first_customer_id,
+            "items": [
+                {
+                    "product_id": first_product_id,
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+    assert first_response.status_code == 201
+
+    second_response = client.post(
+        "/sales",
+        json={
+            "customer_id": second_customer_id,
+            "items": [
+                {
+                    "product_id": first_product_id,
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+    assert second_response.status_code == 201
+
+    response = client.get(
+        f"/sales/paginated?customer_id={first_customer_id}"
+    )
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert data["total"] == 1
+    assert len(data["items"]) == 1
+    assert data["items"][0]["customer_id"] == first_customer_id
