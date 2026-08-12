@@ -477,3 +477,32 @@ def test_list_stock_movements_returns_404_for_unknown_product(client):
     assert response.get_json() == {
         "error": "product not found"
     }
+
+def test_list_stock_movements(client, app):
+    with app.app_context():
+        sale_id, product_id = create_open_sale()
+
+    confirm_response = client.post(f"/sales/{sale_id}/confirm")
+    assert confirm_response.status_code == 200
+
+    response = client.get(
+        f"/products/{product_id}/stock-movements"
+    )
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert len(data) == 1
+    assert data[0]["product_id"] == product_id
+    assert data[0]["sale_id"] == sale_id
+    assert data[0]["movement_type"] == "OUT"
+
+
+def test_list_stock_movements_returns_404_for_unknown_product(client):
+    response = client.get("/products/999999/stock-movements")
+
+    assert response.status_code == 404
+    assert response.get_json() == {
+        "error": "product not found"
+    }
