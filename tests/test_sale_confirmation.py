@@ -506,3 +506,82 @@ def test_list_stock_movements_returns_404_for_unknown_product(client):
     assert response.get_json() == {
         "error": "product not found"
     }
+
+def test_confirm_sale_is_atomic_when_one_item_lacks_stock(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="77777777777",
+            name="Cliente atomicidade",
+        )
+
+        product_ok = Product(
+            sku="ATOMIC-OK",
+            name="Produto com estoque",
+            price=Decimal("10.00"),
+            stock_quantity=10,
+        )
+
+        product_without_stock = Product(
+            sku="ATOMIC-NOK",
+            name="Produto sem estoque suficiente",
+            price=Decimal("20.00"),
+            stock_quantity=1,
+        )
+
+        db.session.add_all([
+            customer,
+            product_ok,
+            product_without_stock,
+        ])
+        db.session.commit()
+
+        sale = Sale(
+            customer_id=customer.id,
+            status="OPEN",
+            total_amount=Decimal("50.00"),
+        )
+        db.session.add(sale)
+        db.session.commit()
+
+        db.session.add_all([
+            SaleItem(
+                sale_id=sale.id,
+                product_id=product_ok.id,
+                quantity=2,
+                unit_price=product_ok.price,
+            ),
+            SaleItem(
+                sale_id=sale.id,
+                product_id=product_without_stock.id,
+                quantity=2,
+                unit_price=product_without_stock.price,
+            ),
+        ])
+        db.session.commit()
+
+        sale_id = sale.id
+        product_ok_id = product_ok.id
+        product_without_stock_id = product_without_stock.id
+
+    response = client.post(f"/sales/{sale_id}/confirm")
+
+    assert response.status_code == 400
+
+    with app.app_context():
+        sale = db.session.get(Sale, sale_id)
+        product_ok = db.session.get(Product, product_ok_id)
+        product_without_stock = db.session.get(
+            Product,
+            product_without_stock_id,
+        )
+
+        movements = db.session.scalars(
+            db.select(StockMovement).where(
+                StockMovement.sale_id == sale_id
+            )
+        ).all()
+
+        assert sale.status == "OPEN"
+        assert product_ok.stock_quantity == 10
+        assert product_without_stock.stock_quantity == 1
+        assert movements == []
