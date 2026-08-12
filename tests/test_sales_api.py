@@ -5,7 +5,7 @@ from app.customer_models import Customer
 from app.models import Product
 from app.sale_models import Sale, SaleItem
 from app.sale_status import CANCELLED, CONFIRMED, OPEN
-
+import pytest
 
 def create_sale_data():
     customer = Customer(
@@ -839,7 +839,6 @@ def test_list_sales_paginated_returns_empty_page(client, app):
     assert data["pages"] == 1
     assert data["items"] == []
 
-import pytest
 
 @pytest.mark.parametrize(
     "parameter",
@@ -968,3 +967,63 @@ def test_list_sales_paginated_does_not_mix_statuses(client, app):
     assert data["items"][0]["id"] == open_sale_id
     assert data["items"][0]["status"] == "CONFIRMED"
     assert data["items"][0]["id"] != second_sale_id
+
+def test_list_sales_paginated_rejects_unknown_status(client):
+    response = client.get(
+        "/sales/paginated?status=INVALID"
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "invalid sale status"
+
+
+def test_list_sales_paginated_rejects_non_integer_customer_id(client):
+    response = client.get(
+        "/sales/paginated?customer_id=abc"
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == (
+        "customer_id must be an integer"
+    )
+
+
+@pytest.mark.parametrize("customer_id", ["0", "-1"])
+def test_list_sales_paginated_rejects_non_positive_customer_id(
+    client,
+    customer_id,
+):
+    response = client.get(
+        f"/sales/paginated?customer_id={customer_id}"
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == (
+        "customer_id must be positive"
+    )
+
+
+@pytest.mark.parametrize("per_page", ["0", "-1"])
+def test_list_sales_paginated_rejects_non_positive_per_page(
+    client,
+    per_page,
+):
+    response = client.get(
+        f"/sales/paginated?per_page={per_page}"
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == (
+        "per_page must be positive"
+    )
+
+
+def test_list_sales_paginated_rejects_non_integer_page(client):
+    response = client.get(
+        "/sales/paginated?page=abc"
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == (
+        "page and per_page must be integers"
+    )
