@@ -32,6 +32,38 @@ Para configurar variáveis de ambiente, copie o arquivo de exemplo:
 Copy-Item .env.example .env
 ```
 
+## Banco de dados e migrações
+
+Para aplicar as migrações no banco configurado:
+
+```powershell
+python -m flask --app run.py db upgrade
+```
+
+Para verificar a revisão atual:
+
+```powershell
+python -m flask --app run.py db current
+```
+
+Para verificar se os modelos e as migrações estão sincronizados:
+
+```powershell
+python -m flask --app run.py db check
+```
+
+Quando houver alteração estrutural nos modelos, gere uma migration:
+
+```powershell
+python -m flask --app run.py db migrate -m "descreva a alteração"
+```
+
+Revise o arquivo gerado antes de aplicar:
+
+```powershell
+python -m flask --app run.py db upgrade
+```
+
 ## Executar a aplicação
 
 ```powershell
