@@ -1,7 +1,6 @@
 ﻿from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, jsonify, request
-from sqlalchemy import update
 
 from app import db
 from app.customer_models import Customer
@@ -14,7 +13,10 @@ from app.sale_status import (
     SALE_STATUSES,
 )
 from app.stock_movement_models import StockMovement
-
+from app.stock_movement_service import (
+    StockMovementError,
+    apply_stock_out,
+)
 
 
 main = Blueprint("main", __name__)
@@ -387,6 +389,8 @@ def create_sale():
     db.session.commit()
 
     return jsonify(sale_to_dict(sale)), 201
+
+
 def apply_sale_filters(query):
     status = request.args.get("status")
     customer_id = request.args.get("customer_id")
@@ -561,7 +565,6 @@ def get_sale(sale_id):
 
     return jsonify(sale_to_dict(sale))
 
-
 @main.post("/sales/<int:sale_id>/confirm")
 def confirm_sale(sale_id):
     sale = db.get_or_404(Sale, sale_id)
@@ -573,34 +576,19 @@ def confirm_sale(sale_id):
 
     for item in sale.items:
         product = item.product
-        stock_before = product.stock_quantity
 
-        result = db.session.execute(
-            update(Product)
-            .where(
-                Product.id == product.id,
-                Product.stock_quantity >= item.quantity,
+        try:
+            apply_stock_out(
+                product=product,
+                quantity=item.quantity,
+                sale_id=sale.id,
             )
-            .values(
-                stock_quantity=Product.stock_quantity - item.quantity
-            )
-        )
-
-        if result.rowcount != 1:
+        except StockMovementError as exc:
             db.session.rollback()
 
             return jsonify({
-                "error": f"insufficient stock for product {product.sku}"
+                "error": str(exc)
             }), 400
-
-        db.session.add(StockMovement(
-            product_id=product.id,
-            sale_id=sale.id,
-            movement_type="OUT",
-            quantity=item.quantity,
-            stock_before=stock_before,
-            stock_after=stock_before - item.quantity,
-        ))
 
     sale.status = CONFIRMED
     db.session.commit()
