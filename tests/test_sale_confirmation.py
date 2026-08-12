@@ -5,6 +5,7 @@ from app.customer_models import Customer
 from app.models import Product
 from app.sale_models import Sale, SaleItem
 from app.sale_status import CANCELLED, CONFIRMED
+from app.stock_movement_models import StockMovement
 
 
 def create_open_sale():
@@ -426,3 +427,53 @@ def test_cancel_sale_rejects_confirmed_sale(client, app):
 
     assert response.status_code == 400
     assert response.get_json()["error"] == "only open sales can be cancelled"
+
+def test_confirm_sale_creates_stock_movement(client, app):
+    with app.app_context():
+        sale_id, product_id = create_open_sale()
+
+    response = client.post(f"/sales/{sale_id}/confirm")
+
+    assert response.status_code == 200
+
+    with app.app_context():
+        movement = db.session.scalar(
+            db.select(StockMovement).where(
+                StockMovement.sale_id == sale_id
+            )
+        )
+
+        assert movement is not None
+        assert movement.product_id == product_id
+        assert movement.movement_type == "OUT"
+        assert movement.quantity == 2
+        assert movement.stock_before == 10
+        assert movement.stock_after == 8
+
+def test_list_stock_movements(client, app):
+    with app.app_context():
+        sale_id, product_id = create_open_sale()
+
+    confirm_response = client.post(f"/sales/{sale_id}/confirm")
+    assert confirm_response.status_code == 200
+
+    response = client.get(
+        f"/products/{product_id}/stock-movements"
+    )
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert len(data) == 1
+    assert data[0]["product_id"] == product_id
+    assert data[0]["sale_id"] == sale_id
+    assert data[0]["movement_type"] == "OUT"
+
+def test_list_stock_movements_returns_404_for_unknown_product(client):
+    response = client.get("/products/999999/stock-movements")
+
+    assert response.status_code == 404
+    assert response.get_json() == {
+        "error": "product not found"
+    }
