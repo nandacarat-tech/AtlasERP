@@ -6,7 +6,7 @@ from app.models import Product
 from app.sale_models import Sale, SaleItem
 from app.sale_status import CANCELLED, CONFIRMED
 from app.stock_movement_models import StockMovement
-
+import pytest
 
 def create_open_sale():
     customer = Customer(
@@ -615,3 +615,32 @@ def test_confirm_sale_cannot_be_confirmed_twice(
         assert len(movements) == 1
         assert movements[0].movement_type == "OUT"
         assert product.stock_quantity == 8
+
+def test_stock_movement_rejects_invalid_type(app):
+    with app.app_context():
+        with pytest.raises(
+            ValueError,
+            match="movement_type",
+        ):
+            StockMovement(
+                product_id=1,
+                movement_type="INVALID",
+                quantity=1,
+                stock_before=0,
+                stock_after=1,
+            )
+
+
+def test_stock_movement_rejects_non_positive_quantity(app):
+    with app.app_context():
+        with pytest.raises(
+            ValueError,
+            match="quantity",
+        ):
+            StockMovement(
+                product_id=1,
+                movement_type="IN",
+                quantity=0,
+                stock_before=0,
+                stock_after=0,
+            )
