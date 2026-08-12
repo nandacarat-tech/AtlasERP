@@ -915,3 +915,56 @@ def test_list_sales_paginated_does_not_mix_customers(client, app):
     assert data["total"] == 1
     assert len(data["items"]) == 1
     assert data["items"][0]["customer_id"] == first_customer_id
+
+def test_list_sales_paginated_does_not_mix_statuses(client, app):
+    with app.app_context():
+        customer_id, product_id = create_sale_data()
+
+    open_response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+    assert open_response.status_code == 201
+    open_sale_id = open_response.get_json()["id"]
+
+    confirmed_response = client.post(
+        f"/sales/{open_sale_id}/confirm"
+    )
+    assert confirmed_response.status_code == 200
+
+    second_response = client.post(
+        "/sales",
+        json={
+            "customer_id": customer_id,
+            "items": [
+                {
+                    "product_id": product_id,
+                    "quantity": 1,
+                }
+            ],
+        },
+    )
+    assert second_response.status_code == 201
+    second_sale_id = second_response.get_json()["id"]
+
+    response = client.get(
+        "/sales/paginated?status=CONFIRMED"
+    )
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert data["total"] == 1
+    assert len(data["items"]) == 1
+    assert data["items"][0]["id"] == open_sale_id
+    assert data["items"][0]["status"] == "CONFIRMED"
+    assert data["items"][0]["id"] != second_sale_id
