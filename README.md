@@ -152,3 +152,10 @@ A rota `/sales` não foi alterada para preservar compatibilidade com consumidore
 
 - [Visão geral do projeto](docs/overview.md)
 - [Arquitetura](docs/architecture.md)
+
+## Documentação adicional
+
+- [Visão geral do projeto](docs/overview.md)
+- [Arquitetura](docs/architecture.md)
+- [API](docs/api.md)
+
