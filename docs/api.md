@@ -1,11 +1,11 @@
-# API do AtlasERP
+﻿# API do AtlasERP
 
-## Convenções
+## Convencoes
 
 - As respostas usam JSON.
-- IDs são inteiros positivos.
-- Datas e valores monetários são serializados pelas funções de representação do projeto.
-- Erros de validação retornam um objeto com a chave `error`.
+- IDs sao inteiros positivos.
+- Datas e valores monetarios sao serializados pelas funcoes de representacao do projeto.
+- Erros de validacao retornam um objeto com a chave `error`.
 
 ## Vendas
 
@@ -15,7 +15,7 @@
 GET /sales
 ```
 
-A resposta é uma lista JSON. Filtros opcionais:
+A resposta e uma lista JSON. Filtros opcionais:
 
 ```http
 GET /sales?status=OPEN
@@ -23,7 +23,7 @@ GET /sales?customer_id=1
 GET /sales?status=CONFIRMED&customer_id=1
 ```
 
-Status válidos:
+Status validos:
 
 - `OPEN`
 - `CONFIRMED`
@@ -37,20 +37,20 @@ Exemplo de erro:
 }
 ```
 
-### Listar vendas com paginação
+### Listar vendas com paginacao
 
 ```http
 GET /sales/paginated
 ```
 
-Parâmetros:
+Parametros:
 
-| Parâmetro | Obrigatório | Padrão | Restrições |
+| Parametro | Obrigatorio | Padrao | Restricoes |
 |---|---:|---:|---|
-| `page` | Não | `1` | Inteiro positivo |
-| `per_page` | Não | `10` | Inteiro entre `1` e `100` |
-| `status` | Não | — | `OPEN`, `CONFIRMED` ou `CANCELLED` |
-| `customer_id` | Não | — | Inteiro positivo |
+| `page` | Nao | `1` | Inteiro positivo |
+| `per_page` | Nao | `10` | Inteiro entre `1` e `100` |
+| `status` | Nao | `-` | `OPEN`, `CONFIRMED` ou `CANCELLED` |
+| `customer_id` | Nao | `-` | Inteiro positivo |
 
 Exemplo:
 
@@ -72,13 +72,13 @@ Resposta:
 
 Os campos significam:
 
-- `items`: vendas da página solicitada;
-- `page`: página atual;
-- `per_page`: quantidade máxima de itens por página;
-- `total`: total após aplicação dos filtros;
-- `pages`: número total de páginas.
+- `items`: vendas da pagina solicitada;
+- `page`: pagina atual;
+- `per_page`: quantidade maxima de itens por pagina;
+- `total`: total apos aplicacao dos filtros;
+- `pages`: numero total de paginas.
 
-A rota `/sales` permanece sem paginação para preservar compatibilidade com consumidores existentes.
+A rota `/sales` permanece sem paginacao para preservar compatibilidade com consumidores existentes.
 
 ### Consultar uma venda
 
