@@ -820,6 +820,9 @@ def list_purchases():
     status = request.args.get("status")
     supplier_id = request.args.get("supplier_id", type=int)
 
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+
     if status:
         query = query.filter(Purchase.status == status)
 
@@ -828,7 +831,23 @@ def list_purchases():
             Purchase.supplier_id == supplier_id
         )
 
-    purchases = query.order_by(Purchase.id).all()
+    if page < 1:
+        return jsonify(
+            {"error": "page must be greater than zero"}
+        ), 400
+
+    if per_page < 1 or per_page > 100:
+        return jsonify(
+            {"error": "per_page must be between 1 and 100"}
+        ), 400
+
+    purchases = (
+        query
+        .order_by(Purchase.id)
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
 
     return jsonify(
         [purchase_to_dict(purchase) for purchase in purchases]
