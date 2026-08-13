@@ -189,3 +189,70 @@ def test_list_purchases_combined_filters_return_empty_list(
 
     assert response.status_code == 200
     assert response.get_json() == []
+
+def test_list_purchases_combined_filters_with_pagination(
+    client,
+    app,
+):
+    with app.app_context():
+        supplier = Supplier(
+            document="COMBINED-SUP-004",
+            name="Fornecedor Com Paginação",
+            is_active=True,
+        )
+
+        db.session.add(supplier)
+        db.session.flush()
+
+        db.session.add_all(
+            [
+                Purchase(
+                    supplier_id=supplier.id,
+                    status="OPEN",
+                    total_amount=Decimal("100.00"),
+                ),
+                Purchase(
+                    supplier_id=supplier.id,
+                    status="OPEN",
+                    total_amount=Decimal("200.00"),
+                ),
+                Purchase(
+                    supplier_id=supplier.id,
+                    status="OPEN",
+                    total_amount=Decimal("300.00"),
+                ),
+                Purchase(
+                    supplier_id=supplier.id,
+                    status="RECEIVED",
+                    total_amount=Decimal("400.00"),
+                ),
+            ]
+        )
+
+        db.session.commit()
+
+        supplier_id = supplier.id
+
+    response = client.get(
+        (
+            "/purchases"
+            f"?status=OPEN"
+            f"&supplier_id={supplier_id}"
+            "&page=1"
+            "&per_page=2"
+        )
+    )
+
+    assert response.status_code == 200
+
+    body = response.get_json()
+
+    assert body["page"] == 1
+    assert body["per_page"] == 2
+    assert body["total"] == 3
+    assert body["pages"] == 2
+    assert len(body["items"]) == 2
+
+    for item in body["items"]:
+        assert item["status"] == "OPEN"
+        assert item["supplier_id"] == supplier_id
