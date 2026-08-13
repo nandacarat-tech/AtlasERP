@@ -27,6 +27,7 @@ from app.purchase_service import (
     cancel_purchase,
     receive_purchase,
 )
+from app.purchase_status import PURCHASE_STATUSES
 
 
 main = Blueprint("main", __name__)
@@ -446,6 +447,15 @@ def create_sale():
 
 def apply_sale_filters(query):
     status = request.args.get("status")
+
+    if status and status not in PURCHASE_STATUSES:
+        return jsonify(
+            {
+                "error": "invalid purchase status",
+                "allowed_statuses": sorted(PURCHASE_STATUSES),
+            }
+        ), 400
+
     customer_id = request.args.get("customer_id")
 
     if status and status not in SALE_STATUSES:
@@ -819,6 +829,14 @@ def list_purchases():
 
     status = request.args.get("status")
     supplier_id = request.args.get("supplier_id", type=int)
+       
+    if status and status not in PURCHASE_STATUSES:
+        return jsonify(
+            {
+                "error": "invalid purchase status",
+                "allowed_statuses": sorted(PURCHASE_STATUSES),
+            }
+        ), 400
 
     page_arg = request.args.get("page")
     per_page_arg = request.args.get("per_page")
