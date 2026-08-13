@@ -22,6 +22,11 @@ from app.purchase_service import PurchaseError, receive_purchase
 from app.purchase_models import Purchase, PurchaseItem
 from app.purchase_service import PurchaseError, receive_purchase
 from app.supplier_models import Supplier
+from app.purchase_service import (
+    PurchaseError,
+    cancel_purchase,
+    receive_purchase,
+)
 
 
 main = Blueprint("main", __name__)
@@ -909,5 +914,21 @@ def get_purchase(purchase_id):
 
     if purchase is None:
         return jsonify({"error": "purchase not found"}), 404
+
+    return jsonify(purchase_to_dict(purchase))
+
+@main.post("/purchases/<int:purchase_id>/cancel")
+def cancel_purchase_route(purchase_id):
+    purchase = db.session.get(Purchase, purchase_id)
+
+    if purchase is None:
+        return jsonify({"error": "purchase not found"}), 404
+
+    try:
+        cancel_purchase(purchase=purchase)
+        db.session.commit()
+    except PurchaseError as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
 
     return jsonify(purchase_to_dict(purchase))

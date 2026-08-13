@@ -1,7 +1,7 @@
 ﻿from datetime import datetime, timezone
 
 from app import db
-from app.purchase_status import OPEN, RECEIVED
+from app.purchase_status import OPEN, RECEIVED, CANCELED
 from app.stock_movement_service import apply_stock_in
 
 
@@ -53,3 +53,15 @@ def receive_purchase(*, purchase):
     purchase.received_at = datetime.now(timezone.utc)
 
     return purchase
+
+
+def cancel_purchase(*, purchase):
+    if purchase.status != OPEN:
+        raise PurchaseError(
+            "only open purchases can be canceled"
+        )
+
+    purchase.status = CANCELED
+
+    return purchase
+
