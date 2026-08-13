@@ -22,3 +22,24 @@ def test_list_purchases_accepts_canceled_status(client):
 
     assert response.status_code == 200
     assert isinstance(response.get_json(), list)
+
+
+import pytest
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["abc", "0", "-1"],
+)
+def test_list_purchases_rejects_invalid_supplier_id(
+    client,
+    value,
+):
+    response = client.get(
+        f"/purchases?supplier_id={value}"
+    )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "error": "supplier_id must be a positive integer"
+    }

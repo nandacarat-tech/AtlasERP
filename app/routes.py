@@ -448,21 +448,38 @@ def create_sale():
 def apply_sale_filters(query):
     status = request.args.get("status")
 
-    if status and status not in PURCHASE_STATUSES:
+    if status and status not in SALE_STATUSES:
         return jsonify(
             {
-                "error": "invalid purchase status",
-                "allowed_statuses": sorted(PURCHASE_STATUSES),
+                "error": "invalid sale status",
+                "allowed_statuses": sorted(SALE_STATUSES),
             }
         ), 400
 
     customer_id = request.args.get("customer_id")
 
-    if status and status not in SALE_STATUSES:
-        return None, (
-            jsonify({"error": "invalid sale status"}),
-            400,
-        )
+    if supplier_id_arg is None:
+        supplier_id = None
+    else:
+        try:
+            supplier_id = int(supplier_id_arg)
+        except ValueError:
+            return jsonify(
+            {
+                "error": (
+                    "supplier_id must be a positive integer"
+                )
+             }
+        ), 400
+
+    if supplier_id <= 0:
+        return jsonify(
+            {
+                "error": (
+                    "supplier_id must be a positive integer"
+                )
+            }
+        ), 400
 
     if status:
         query = query.filter_by(status=status)
@@ -828,8 +845,8 @@ def list_purchases():
     query = Purchase.query
 
     status = request.args.get("status")
-    supplier_id = request.args.get("supplier_id", type=int)
-       
+    supplier_id_arg = request.args.get("supplier_id")
+
     if status and status not in PURCHASE_STATUSES:
         return jsonify(
             {
@@ -837,6 +854,29 @@ def list_purchases():
                 "allowed_statuses": sorted(PURCHASE_STATUSES),
             }
         ), 400
+
+    if supplier_id_arg is None:
+        supplier_id = None
+    else:
+        try:
+            supplier_id = int(supplier_id_arg)
+        except (TypeError, ValueError):
+            return jsonify(
+                {
+                    "error": (
+                        "supplier_id must be a positive integer"
+                    )
+                }
+            ), 400
+
+        if supplier_id <= 0:
+            return jsonify(
+                {
+                    "error": (
+                        "supplier_id must be a positive integer"
+                    )
+                }
+            ), 400
 
     page_arg = request.args.get("page")
     per_page_arg = request.args.get("per_page")
