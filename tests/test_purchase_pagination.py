@@ -38,11 +38,21 @@ def test_list_purchases_supports_pagination(client, app):
     assert first_page.status_code == 200
     assert second_page.status_code == 200
 
-    first_items = first_page.get_json()
-    second_items = second_page.get_json()
+    first_body = first_page.get_json()
+    second_body = second_page.get_json()
+
+    first_items = first_body["items"]
+    second_items = second_body["items"]
 
     assert len(first_items) == 2
     assert len(second_items) == 2
+
+    assert first_body["page"] == 1
+    assert second_body["page"] == 2
+    assert first_body["per_page"] == 2
+    assert second_body["per_page"] == 2
+    assert first_body["total"] == 5
+    assert first_body["pages"] == 3
 
     assert first_items[0]["id"] < second_items[0]["id"]
 

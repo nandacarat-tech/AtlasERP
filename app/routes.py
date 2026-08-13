@@ -820,6 +820,13 @@ def list_purchases():
     status = request.args.get("status")
     supplier_id = request.args.get("supplier_id", type=int)
 
+    page_arg = request.args.get("page")
+    per_page_arg = request.args.get("per_page")
+
+    pagination_requested = (
+        page_arg is not None or per_page_arg is not None
+    )
+
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
 
@@ -841,6 +848,18 @@ def list_purchases():
             {"error": "per_page must be between 1 and 100"}
         ), 400
 
+    if not pagination_requested:
+        purchases = query.order_by(Purchase.id).all()
+
+        return jsonify(
+            [
+                purchase_to_dict(purchase)
+                for purchase in purchases
+            ]
+        )
+
+    total = query.count()
+
     purchases = (
         query
         .order_by(Purchase.id)
@@ -849,8 +868,19 @@ def list_purchases():
         .all()
     )
 
+    pages = (total + per_page - 1) // per_page
+
     return jsonify(
-        [purchase_to_dict(purchase) for purchase in purchases]
+        {
+            "items": [
+                purchase_to_dict(purchase)
+                for purchase in purchases
+            ],
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "pages": pages,
+        }
     )
 
 
