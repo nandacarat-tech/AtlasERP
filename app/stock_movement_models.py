@@ -22,6 +22,12 @@ class StockMovement(db.Model):
         nullable=True,
     )
 
+    purchase_id = db.Column(
+        db.Integer,
+        db.ForeignKey("purchases.id"),
+        nullable=True,
+    )
+
     movement_type = db.Column(
         db.String(10),
         nullable=False,
@@ -82,5 +88,10 @@ class StockMovement(db.Model):
 
     sale = db.relationship(
         "Sale",
+        backref="stock_movements",
+    )
+
+    purchase = db.relationship(
+        "Purchase",
         backref="stock_movements",
     )

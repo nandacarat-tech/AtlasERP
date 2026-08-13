@@ -17,6 +17,11 @@ from app.stock_movement_service import (
     StockMovementError,
     apply_stock_out,
 )
+from app.purchase_models import Purchase
+from app.purchase_service import PurchaseError, receive_purchase
+from app.purchase_models import Purchase, PurchaseItem
+from app.purchase_service import PurchaseError, receive_purchase
+from app.supplier_models import Supplier
 
 
 main = Blueprint("main", __name__)
@@ -59,6 +64,49 @@ def sale_to_dict(sale):
                 "subtotal": str(item.subtotal),
             }
             for item in sale.items
+        ],
+    }
+
+def supplier_to_dict(supplier):
+    return {
+        "id": supplier.id,
+        "document": supplier.document,
+        "name": supplier.name,
+        "email": supplier.email,
+        "phone": supplier.phone,
+        "is_active": supplier.is_active,
+    }
+
+
+def purchase_item_to_dict(item):
+    return {
+        "id": item.id,
+        "product_id": item.product_id,
+        "quantity": item.quantity,
+        "unit_cost": str(item.unit_cost),
+        "subtotal": str(item.subtotal),
+    }
+
+
+def purchase_to_dict(purchase):
+    return {
+        "id": purchase.id,
+        "supplier_id": purchase.supplier_id,
+        "status": purchase.status,
+        "total_amount": str(purchase.total_amount),
+        "received_at": (
+            purchase.received_at.isoformat()
+            if purchase.received_at
+            else None
+        ),
+        "created_at": (
+            purchase.created_at.isoformat()
+            if purchase.created_at
+            else None
+        ),
+        "items": [
+            purchase_item_to_dict(item)
+            for item in purchase.items
         ],
     }
 
@@ -643,3 +691,223 @@ def list_stock_movements(product_id):
         }
         for movement in movements
     ])
+
+@main.post("/purchases/<int:purchase_id>/receive")
+def receive_purchase_route(purchase_id):
+    purchase = db.session.get(Purchase, purchase_id)
+
+    if purchase is None:
+        return jsonify({"error": "purchase not found"}), 404
+
+    try:
+        receive_purchase(purchase=purchase)
+        db.session.commit()
+    except PurchaseError as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "could not receive purchase"}), 500
+
+    return jsonify(
+        {
+            "id": purchase.id,
+            "status": purchase.status,
+            "total_amount": str(purchase.total_amount),
+            "received_at": purchase.received_at.isoformat(),
+        }
+    )
+
+@main.post("/suppliers")
+def create_supplier():
+    data = request.get_json(silent=True) or {}
+
+    document = data.get("document")
+    name = data.get("name")
+
+    if not document or not name:
+        return jsonify(
+            {"error": "document and name are required"}
+        ), 400
+
+    if Supplier.query.filter_by(document=document).first():
+        return jsonify(
+            {"error": "supplier document already exists"}
+        ), 409
+
+    email = data.get("email")
+
+    if email and Supplier.query.filter_by(email=email).first():
+        return jsonify(
+            {"error": "supplier email already exists"}
+        ), 409
+
+    supplier = Supplier(
+        document=document,
+        name=name,
+        email=email,
+        phone=data.get("phone"),
+        is_active=data.get("is_active", True),
+    )
+
+    db.session.add(supplier)
+    db.session.commit()
+
+    return jsonify(supplier_to_dict(supplier)), 201
+
+@main.get("/suppliers")
+def list_suppliers():
+    suppliers = Supplier.query.order_by(Supplier.id).all()
+    return jsonify(
+        [supplier_to_dict(supplier) for supplier in suppliers]
+    )
+
+@main.patch("/suppliers/<int:supplier_id>")
+def update_supplier(supplier_id):
+    supplier = db.session.get(Supplier, supplier_id)
+
+    if supplier is None:
+        return jsonify({"error": "supplier not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+
+    for field in ("name", "email", "phone", "is_active"):
+        if field in data:
+            setattr(supplier, field, data[field])
+
+    db.session.commit()
+
+    return jsonify(supplier_to_dict(supplier))
+
+@main.post("/purchases")
+def create_purchase():
+    data = request.get_json(silent=True) or {}
+    supplier_id = data.get("supplier_id")
+
+    if not supplier_id:
+        return jsonify(
+            {"error": "supplier_id is required"}
+        ), 400
+
+    supplier = db.session.get(Supplier, supplier_id)
+
+    if supplier is None:
+        return jsonify({"error": "supplier not found"}), 404
+
+    if not supplier.is_active:
+        return jsonify({"error": "supplier is inactive"}), 400
+
+    purchase = Purchase(
+        supplier_id=supplier.id,
+        status="OPEN",
+        total_amount="0.00",
+    )
+
+    db.session.add(purchase)
+    db.session.commit()
+
+    return jsonify(purchase_to_dict(purchase)), 201
+
+@main.get("/purchases")
+def list_purchases():
+    purchases = Purchase.query.order_by(Purchase.id).all()
+    return jsonify(
+        [purchase_to_dict(purchase) for purchase in purchases]
+    )
+
+@main.post("/purchases/<int:purchase_id>/items")
+def add_purchase_item(purchase_id):
+    purchase = db.session.get(Purchase, purchase_id)
+
+    if purchase is None:
+        return jsonify({"error": "purchase not found"}), 404
+
+    if purchase.status != "OPEN":
+        return jsonify(
+            {"error": "purchase is not open"}
+        ), 400
+
+    data = request.get_json(silent=True) or {}
+
+    product_id = data.get("product_id")
+    quantity = data.get("quantity")
+    unit_cost = data.get("unit_cost")
+
+    if not product_id or not isinstance(quantity, int):
+        return jsonify(
+            {"error": "product_id and integer quantity are required"}
+        ), 400
+
+    if quantity <= 0:
+        return jsonify(
+            {"error": "quantity must be greater than zero"}
+        ), 400
+
+    if unit_cost is None:
+        return jsonify(
+            {"error": "unit_cost is required"}
+        ), 400
+
+    try:
+        unit_cost = Decimal(str(unit_cost))
+    except (InvalidOperation, TypeError, ValueError):
+        return jsonify(
+            {"error": "unit_cost must be a valid number"}
+        ), 400
+
+    if unit_cost <= 0:
+        return jsonify(
+            {"error": "unit_cost must be greater than zero"}
+        ), 400
+
+    product = db.session.get(Product, product_id)
+
+    if product is None:
+        return jsonify({"error": "product not found"}), 404
+
+    if PurchaseItem.query.filter_by(
+        purchase_id=purchase.id,
+        product_id=product.id,
+    ).first():
+        return jsonify(
+            {"error": "duplicate products are not allowed"}
+        ), 409
+
+    try:
+        item = PurchaseItem(
+            purchase_id=purchase.id,
+            product_id=product.id,
+            quantity=quantity,
+            unit_cost=unit_cost,
+        )
+
+        db.session.add(item)
+        db.session.flush()
+
+        purchase.recalculate_total()
+        db.session.commit()
+
+    except (ValueError, TypeError) as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(purchase_to_dict(purchase)), 201
+
+
+@main.get("/suppliers/<int:supplier_id>")
+def get_supplier(supplier_id):
+    supplier = db.session.get(Supplier, supplier_id)
+
+    if supplier is None:
+        return jsonify({"error": "supplier not found"}), 404
+
+    return jsonify(supplier_to_dict(supplier))
+
+@main.get("/purchases/<int:purchase_id>")
+def get_purchase(purchase_id):
+    purchase = db.session.get(Purchase, purchase_id)
+
+    if purchase is None:
+        return jsonify({"error": "purchase not found"}), 404
+
+    return jsonify(purchase_to_dict(purchase))

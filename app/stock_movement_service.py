@@ -31,3 +31,46 @@ def apply_stock_out(*, product, quantity, sale_id=None):
 
     db.session.add(movement)
     return movement
+
+
+def apply_stock_in(*, product, quantity, purchase_id=None):
+    if quantity <= 0:
+        raise StockMovementError(
+            "quantity must be greater than zero"
+        )
+
+    stock_before = product.stock_quantity
+    product.stock_quantity += quantity
+
+    movement = StockMovement(
+        product_id=product.id,
+        purchase_id=purchase_id,
+        movement_type="IN",
+        quantity=quantity,
+        stock_before=stock_before,
+        stock_after=product.stock_quantity,
+    )
+
+    db.session.add(movement)
+    return movement
+
+def apply_stock_in(*, product, quantity, purchase_id=None):
+    if quantity <= 0:
+        raise StockMovementError(
+            "quantity must be greater than zero"
+        )
+
+    stock_before = product.stock_quantity
+    product.stock_quantity += quantity
+
+    movement = StockMovement(
+        product_id=product.id,
+        purchase_id=purchase_id,
+        movement_type="IN",
+        quantity=quantity,
+        stock_before=stock_before,
+        stock_after=product.stock_quantity,
+    )
+
+    db.session.add(movement)
+    return movement
