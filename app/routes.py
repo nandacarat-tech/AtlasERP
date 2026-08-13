@@ -815,10 +815,25 @@ def create_purchase():
 
 @main.get("/purchases")
 def list_purchases():
-    purchases = Purchase.query.order_by(Purchase.id).all()
+    query = Purchase.query
+
+    status = request.args.get("status")
+    supplier_id = request.args.get("supplier_id", type=int)
+
+    if status:
+        query = query.filter(Purchase.status == status)
+
+    if supplier_id is not None:
+        query = query.filter(
+            Purchase.supplier_id == supplier_id
+        )
+
+    purchases = query.order_by(Purchase.id).all()
+
     return jsonify(
         [purchase_to_dict(purchase) for purchase in purchases]
     )
+
 
 @main.post("/purchases/<int:purchase_id>/items")
 def add_purchase_item(purchase_id):
