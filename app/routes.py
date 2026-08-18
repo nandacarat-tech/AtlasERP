@@ -442,69 +442,6 @@ def create_sale():
     return jsonify(sale_to_dict(sale)), 201
 
 
-def apply_sale_filters(query):
-    status = request.args.get("status")
-
-    if status and status not in SALE_STATUSES:
-        return jsonify(
-            {
-                "error": "invalid sale status",
-                "allowed_statuses": sorted(SALE_STATUSES),
-            }
-        ), 400
-
-    customer_id = request.args.get("customer_id")
-
-    if supplier_id_arg is None:
-        supplier_id = None
-    else:
-        try:
-            supplier_id = int(supplier_id_arg)
-        except ValueError:
-            return jsonify(
-            {
-                "error": (
-                    "supplier_id must be a positive integer"
-                )
-             }
-        ), 400
-
-    if supplier_id <= 0:
-        return jsonify(
-            {
-                "error": (
-                    "supplier_id must be a positive integer"
-                )
-            }
-        ), 400
-
-    if status:
-        query = query.filter_by(status=status)
-
-    if customer_id:
-        try:
-            customer_id = int(customer_id)
-        except ValueError:
-            return None, (
-                jsonify({
-                    "error": "customer_id must be an integer"
-                }),
-                400,
-            )
-
-        if customer_id <= 0:
-            return None, (
-                jsonify({
-                    "error": "customer_id must be positive"
-                }),
-                400,
-            )
-
-        query = query.filter_by(customer_id=customer_id)
-
-    return query, None
-
-
 def parse_pagination_params():
     try:
         page = int(request.args.get("page", 1))
