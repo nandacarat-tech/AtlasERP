@@ -316,3 +316,53 @@ def test_list_purchases_combined_filters_second_page(
     assert len(body["items"]) == 1
     assert body["items"][0]["status"] == "OPEN"
     assert body["items"][0]["supplier_id"] == supplier_id
+
+def test_list_purchases_pagination_without_filters(
+    client,
+    app,
+):
+    with app.app_context():
+        supplier = Supplier(
+            document="PAGINATION-SUP-001",
+            name="Fornecedor Paginação Sem Filtro",
+            is_active=True,
+        )
+
+        db.session.add(supplier)
+        db.session.flush()
+
+        db.session.add_all(
+            [
+                Purchase(
+                    supplier_id=supplier.id,
+                    status="OPEN",
+                    total_amount=Decimal("100.00"),
+                ),
+                Purchase(
+                    supplier_id=supplier.id,
+                    status="RECEIVED",
+                    total_amount=Decimal("200.00"),
+                ),
+                Purchase(
+                    supplier_id=supplier.id,
+                    status="CANCELED",
+                    total_amount=Decimal("300.00"),
+                ),
+            ]
+        )
+
+        db.session.commit()
+
+    response = client.get(
+        "/purchases?page=1&per_page=2"
+    )
+
+    assert response.status_code == 200
+
+    body = response.get_json()
+
+    assert body["page"] == 1
+    assert body["per_page"] == 2
+    assert body["total"] == 3
+    assert body["pages"] == 2
+    assert len(body["items"]) == 2
