@@ -58,3 +58,26 @@ def test_deactivate_product(client, app):
 
     assert response.status_code == 200
     assert response.get_json()["is_active"] is False
+
+def test_update_product_preserves_sku(client, app):
+    with app.app_context():
+        product = Product(
+            sku="SKU-PRESERVE",
+            name="Produto original",
+            price="10.00",
+        )
+        db.session.add(product)
+        db.session.commit()
+        product_id = product.id
+
+    response = client.put(
+        f"/products/{product_id}",
+        json={
+            "sku": "SKU-IGNORED",
+            "name": "Produto atualizado",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["sku"] == "SKU-PRESERVE"
+    assert response.get_json()["name"] == "Produto atualizado"
