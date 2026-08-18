@@ -9,3 +9,5 @@ instance/
 .vscode/
 .idea/
 *.log
+consulta_testes_flask.txt
+validar supplier_id.txt
