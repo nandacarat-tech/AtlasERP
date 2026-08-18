@@ -155,12 +155,24 @@ def create_product():
             "error": "sku already exists"
         }), 409
 
+    stock_quantity = data.get("stock_quantity", 0)
+
+    if not isinstance(stock_quantity, int):
+        return jsonify({
+            "error": "stock_quantity must be an integer"
+        }), 400
+
+    if stock_quantity < 0:
+        return jsonify({
+            "error": "stock_quantity cannot be negative"
+        }), 400
+
     product = Product(
         sku=data["sku"],
         name=data["name"],
         description=data.get("description"),
         price=price,
-        stock_quantity=data.get("stock_quantity", 0),
+        stock_quantity=stock_quantity,
         is_active=data.get("is_active", True),
     )
 

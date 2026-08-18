@@ -91,3 +91,36 @@ def test_create_product_rejects_duplicate_sku(client, app):
 
     assert response.status_code == 409
     assert response.get_json()["error"] == "sku already exists"
+
+def test_create_product_rejects_negative_stock(client):
+    response = client.post(
+        "/products",
+        json={
+            "sku": "SKU-NEGATIVE-STOCK",
+            "name": "Produto com estoque inválido",
+            "price": "10.00",
+            "stock_quantity": -1,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == (
+        "stock_quantity cannot be negative"
+    )
+
+
+def test_create_product_rejects_non_integer_stock(client):
+    response = client.post(
+        "/products",
+        json={
+            "sku": "SKU-STRING-STOCK",
+            "name": "Produto com estoque inválido",
+            "price": "10.00",
+            "stock_quantity": "10",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == (
+        "stock_quantity must be an integer"
+    )
