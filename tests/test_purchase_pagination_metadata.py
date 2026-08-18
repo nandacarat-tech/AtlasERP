@@ -118,3 +118,25 @@ def test_unpaginated_purchase_response_remains_a_list(client):
 
     assert response.status_code == 200
     assert isinstance(response.get_json(), list)
+
+def test_list_purchases_pagination_metadata_is_consistent(
+    client,
+):
+    response = client.get(
+        "/purchases?page=1&per_page=2"
+    )
+
+    assert response.status_code == 200
+
+    body = response.get_json()
+
+    assert body["page"] == 1
+    assert body["per_page"] == 2
+    assert body["total"] >= len(body["items"])
+
+    expected_pages = (
+        (body["total"] + body["per_page"] - 1)
+        // body["per_page"]
+    )
+
+    assert body["pages"] == expected_pages
