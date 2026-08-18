@@ -442,41 +442,6 @@ def create_sale():
     return jsonify(sale_to_dict(sale)), 201
 
 
-def parse_pagination_params():
-    try:
-        page = int(request.args.get("page", 1))
-        per_page = int(request.args.get("per_page", 10))
-    except (TypeError, ValueError):
-        return None, None, (
-            jsonify({
-                "error": "page and per_page must be integers"
-            }),
-            400,
-        )
-
-    if page <= 0:
-        return None, None, (
-            jsonify({"error": "page must be positive"}),
-            400,
-        )
-
-    if per_page <= 0:
-        return None, None, (
-            jsonify({"error": "per_page must be positive"}),
-            400,
-        )
-
-    if per_page > 100:
-        return None, None, (
-            jsonify({
-                "error": "per_page cannot be greater than 100"
-            }),
-            400,
-        )
-
-    return page, per_page, None
-
-
 @main.get("/sales")
 def list_sales():
     query = Sale.query.order_by(Sale.id)
