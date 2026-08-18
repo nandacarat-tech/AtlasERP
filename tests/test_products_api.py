@@ -42,3 +42,52 @@ def test_create_product_rejects_missing_fields(client):
     )
 
     assert response.status_code == 400
+
+def test_create_product_rejects_invalid_price(client):
+    response = client.post(
+        "/products",
+        json={
+            "sku": "SKU-INVALID-PRICE",
+            "name": "Produto inválido",
+            "price": "abc",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "price must be a valid number"
+
+
+def test_create_product_rejects_negative_price(client):
+    response = client.post(
+        "/products",
+        json={
+            "sku": "SKU-NEGATIVE-PRICE",
+            "name": "Produto negativo",
+            "price": "-1.00",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "price cannot be negative"
+
+
+def test_create_product_rejects_duplicate_sku(client, app):
+    with app.app_context():
+        db.session.add(Product(
+            sku="SKU-DUPLICATE",
+            name="Produto existente",
+            price="10.00",
+        ))
+        db.session.commit()
+
+    response = client.post(
+        "/products",
+        json={
+            "sku": "SKU-DUPLICATE",
+            "name": "Outro produto",
+            "price": "20.00",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.get_json()["error"] == "sku already exists"
