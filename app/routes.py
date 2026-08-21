@@ -731,9 +731,19 @@ def update_supplier(supplier_id):
 
     data = request.get_json(silent=True) or {}
 
-    for field in ("name", "email", "phone", "is_active"):
+    allowed_fields = {"document", "name", "email", "phone"}
+
+    for field in allowed_fields:
         if field in data:
             setattr(supplier, field, data[field])
+
+    if "is_active" in data:
+        if not isinstance(data["is_active"], bool):
+            return jsonify({
+                "error": "is_active must be a boolean"
+            }), 400
+
+        supplier.is_active = data["is_active"]
 
     db.session.commit()
 
