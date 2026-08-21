@@ -357,7 +357,12 @@ def update_customer(customer_id):
         customer.phone = data["phone"]
 
     if "is_active" in data:
-        customer.is_active = bool(data["is_active"])
+        if not isinstance(data["is_active"], bool):
+            return jsonify({
+                "error": "is_active must be a boolean"
+            }), 400
+
+        customer.is_active = data["is_active"]
 
     db.session.commit()
 

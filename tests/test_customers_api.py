@@ -84,3 +84,23 @@ def test_create_customer_requires_document_and_name(client):
     )
 
     assert response.status_code == 400
+
+def test_update_customer_rejects_string_is_active(client, app):
+    with app.app_context():
+        customer = Customer(
+            document="12345678901",
+            name="Cliente Booleano",
+            email="boolean@example.com",
+            is_active=True,
+        )
+        db.session.add(customer)
+        db.session.commit()
+        customer_id = customer.id
+
+    response = client.put(
+        f"/customers/{customer_id}",
+        json={"is_active": "false"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "is_active must be a boolean"
