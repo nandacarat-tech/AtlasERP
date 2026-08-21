@@ -167,13 +167,20 @@ def create_product():
             "error": "stock_quantity cannot be negative"
         }), 400
 
+    is_active = data.get("is_active", True)
+
+    if not isinstance(is_active, bool):
+        return jsonify({
+            "error": "is_active must be a boolean"
+        }), 400
+
     product = Product(
         sku=data["sku"],
         name=data["name"],
         description=data.get("description"),
         price=price,
         stock_quantity=stock_quantity,
-        is_active=data.get("is_active", True),
+        is_active=is_active,
     )
 
     db.session.add(product)

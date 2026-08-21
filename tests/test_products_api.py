@@ -124,3 +124,32 @@ def test_create_product_rejects_non_integer_stock(client):
     assert response.get_json()["error"] == (
         "stock_quantity must be an integer"
     )
+
+def test_create_product_rejects_string_is_active(client):
+    response = client.post(
+        "/products",
+        json={
+            "sku": "SKU-CREATE-STRING-BOOLEAN",
+            "name": "Produto",
+            "price": "10.00",
+            "is_active": "false",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "is_active must be a boolean"
+
+
+def test_create_product_accepts_boolean_is_active(client):
+    response = client.post(
+        "/products",
+        json={
+            "sku": "SKU-CREATE-BOOLEAN",
+            "name": "Produto inativo",
+            "price": "10.00",
+            "is_active": False,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.get_json()["is_active"] is False
