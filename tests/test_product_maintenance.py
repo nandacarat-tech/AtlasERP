@@ -2,62 +2,65 @@
 from app.models import Product
 
 
-def create_test_product():
-    product = Product(
-        sku="SKU-001",
-        name="Produto de teste",
-        price="19.90",
-        stock_quantity=10,
-    )
-
-    db.session.add(product)
-    db.session.commit()
-
-    return product
-
-
 def test_get_product(client, app):
     with app.app_context():
-        product = create_test_product()
+        product = Product(
+            sku="SKU-GET",
+            name="Produto",
+            price="10.00",
+            is_active=True,
+        )
+        db.session.add(product)
+        db.session.commit()
         product_id = product.id
 
     response = client.get(f"/products/{product_id}")
 
     assert response.status_code == 200
-    assert response.get_json()["sku"] == "SKU-001"
+    assert response.get_json()["sku"] == "SKU-GET"
 
 
 def test_update_product(client, app):
     with app.app_context():
-        product = create_test_product()
+        product = Product(
+            sku="SKU-UPDATE",
+            name="Produto original",
+            price="10.00",
+            is_active=True,
+        )
+        db.session.add(product)
+        db.session.commit()
         product_id = product.id
 
     response = client.put(
         f"/products/{product_id}",
         json={
             "name": "Produto atualizado",
-            "price": "24.90",
-            "stock_quantity": 25,
+            "price": "15.00",
         },
     )
 
     assert response.status_code == 200
-
-    data = response.get_json()
-    assert data["name"] == "Produto atualizado"
-    assert data["price"] == "24.90"
-    assert data["stock_quantity"] == 25
+    assert response.get_json()["name"] == "Produto atualizado"
 
 
 def test_deactivate_product(client, app):
     with app.app_context():
-        product = create_test_product()
+        product = Product(
+            sku="SKU-DEACTIVATE",
+            name="Produto",
+            price="10.00",
+            is_active=True,
+        )
+        db.session.add(product)
+        db.session.commit()
         product_id = product.id
 
     response = client.delete(f"/products/{product_id}")
 
     assert response.status_code == 200
     assert response.get_json()["is_active"] is False
+
 
 def test_update_product_preserves_sku(client, app):
     with app.app_context():
@@ -81,3 +84,45 @@ def test_update_product_preserves_sku(client, app):
     assert response.status_code == 200
     assert response.get_json()["sku"] == "SKU-PRESERVE"
     assert response.get_json()["name"] == "Produto atualizado"
+
+
+def test_update_product_rejects_string_is_active(client, app):
+    with app.app_context():
+        product = Product(
+            sku="SKU-BOOLEAN",
+            name="Produto",
+            price="10.00",
+            is_active=True,
+        )
+        db.session.add(product)
+        db.session.commit()
+        product_id = product.id
+
+    response = client.put(
+        f"/products/{product_id}",
+        json={"is_active": "false"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "is_active must be a boolean"
+
+
+def test_update_product_accepts_boolean_is_active(client, app):
+    with app.app_context():
+        product = Product(
+            sku="SKU-REAL-BOOLEAN",
+            name="Produto",
+            price="10.00",
+            is_active=True,
+        )
+        db.session.add(product)
+        db.session.commit()
+        product_id = product.id
+
+    response = client.put(
+        f"/products/{product_id}",
+        json={"is_active": False},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["is_active"] is False

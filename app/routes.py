@@ -233,7 +233,12 @@ def update_product(product_id):
         product.description = data["description"]
 
     if "is_active" in data:
-        product.is_active = bool(data["is_active"])
+        if not isinstance(data["is_active"], bool):
+            return jsonify({
+                "error": "is_active must be a boolean"
+            }), 400
+
+        product.is_active = data["is_active"]
 
     db.session.commit()
 
