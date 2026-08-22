@@ -12,7 +12,10 @@ migrate = Migrate()
 
 
 def create_app(config_object=None):
-    app = Flask(__name__)
+    app = Flask(
+    __name__,
+    instance_relative_config=True,
+    )
 
     if config_object is not None:
         app.config.from_object(config_object)
