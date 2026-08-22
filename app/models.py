@@ -98,3 +98,95 @@ class FleetVehicle(db.Model):
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
     )
+
+class FleetMaintenance(db.Model):
+    __tablename__ = "fleet_maintenances"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    vehicle_id = db.Column(
+        db.Integer,
+        db.ForeignKey("fleet_vehicles.id"),
+        nullable=False,
+    )
+
+    maintenance_type = db.Column(
+        db.String(30),
+        nullable=False,
+    )
+
+    description = db.Column(
+        db.Text,
+        nullable=False,
+    )
+
+    workshop = db.Column(
+        db.String(120),
+        nullable=True,
+    )
+
+    opened_at = db.Column(
+        db.Date,
+        nullable=False,
+        default=datetime.utcnow,
+    )
+
+    scheduled_at = db.Column(
+        db.Date,
+        nullable=True,
+    )
+
+    completed_at = db.Column(
+        db.Date,
+        nullable=True,
+    )
+
+    mileage = db.Column(
+        db.Integer,
+        nullable=True,
+    )
+
+    cost = db.Column(
+        db.Numeric(10, 2),
+        nullable=True,
+    )
+
+    status = db.Column(
+        db.String(30),
+        nullable=False,
+        default="OPEN",
+    )
+
+    next_maintenance_at = db.Column(
+        db.Date,
+        nullable=True,
+    )
+
+    notes = db.Column(
+        db.Text,
+        nullable=True,
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+    )
+
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+    vehicle = db.relationship(
+        "FleetVehicle",
+        backref=db.backref(
+            "maintenances",
+            lazy=True,
+        ),
+    )
+
+    def __repr__(self):
+        return f"<FleetMaintenance {self.id}>"
