@@ -1,10 +1,10 @@
 ﻿from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, render_template
 
 from app import db
 from app.customer_models import Customer
-from app.models import Product
+from app.models import FleetVehicle, Product
 from app.sale_models import Sale, SaleItem
 from app.sale_status import (
     CANCELLED,
@@ -38,6 +38,7 @@ def product_to_dict(product):
         "description": product.description,
         "price": str(product.price),
         "stock_quantity": product.stock_quantity,
+        "minimum_stock": product.minimum_stock,
         "is_active": product.is_active,
     }
 
@@ -116,11 +117,89 @@ def purchase_to_dict(purchase):
 
 @main.get("/")
 def index():
-    return {
-        "application": "AtlasERP",
-        "status": "online",
-        "message": "AtlasERP iniciado com sucesso",
-    }
+    return jsonify({
+        "application": "AtlasERP"
+    })
+
+
+@main.get("/dashboard")
+def dashboard():
+    products = Product.query.order_by(Product.id).all()
+    customers = Customer.query.order_by(Customer.id).all()
+    suppliers = Supplier.query.order_by(Supplier.id).all()
+    sales = Sale.query.order_by(Sale.id).all()
+    purchases = Purchase.query.order_by(Purchase.id).all()
+
+    out_of_stock_products = [
+        product for product in products
+        if product.is_active and product.stock_quantity == 0
+    ]
+
+    low_stock_products = [
+        product for product in products
+        if product.is_active
+        and product.stock_quantity > 0
+        and product.stock_quantity <= product.minimum_stock
+    ]
+
+    inactive_products = [
+        product for product in products
+        if not product.is_active
+    ]
+
+    open_sales = [
+        sale for sale in sales
+        if sale.status == OPEN
+    ]
+
+    open_purchases = [
+        purchase for purchase in purchases
+        if purchase.status == "OPEN"
+    ]
+
+    return render_template(
+        "index.html",
+        products=[product_to_dict(product) for product in products],
+        customers=[customer_to_dict(customer) for customer in customers],
+        suppliers=[supplier_to_dict(supplier) for supplier in suppliers],
+        sales=[sale_to_dict(sale) for sale in sales],
+        purchases=[purchase_to_dict(purchase) for purchase in purchases],
+        out_of_stock_products=out_of_stock_products,
+        low_stock_products=low_stock_products,
+        inactive_products=inactive_products,
+        open_sales=open_sales,
+        open_purchases=open_purchases,
+    )
+
+
+@main.get("/ui/products")
+def products_page():
+    return render_template("products.html")
+
+
+@main.get("/ui/fleet")
+def fleet_page():
+    return render_template("fleet.html")
+
+
+@main.get("/ui/customers")
+def customers_page():
+    return render_template("customers.html")
+
+
+@main.get("/ui/sales")
+def sales_page():
+    return render_template("sales.html")
+
+
+@main.get("/ui/suppliers")
+def suppliers_page():
+    return render_template("suppliers.html")
+
+
+@main.get("/ui/purchases")
+def purchases_page():
+    return render_template("purchases.html")
 
 
 @main.get("/products")
@@ -156,6 +235,17 @@ def create_product():
         }), 409
 
     stock_quantity = data.get("stock_quantity", 0)
+    minimum_stock = data.get("minimum_stock", 0)
+
+    if not isinstance(minimum_stock, int):
+        return jsonify({
+            "error": "minimum_stock must be an integer"
+        }), 400
+
+    if minimum_stock < 0:
+        return jsonify({
+            "error": "minimum_stock cannot be negative"
+        }), 400
 
     if not isinstance(stock_quantity, int):
         return jsonify({
@@ -180,6 +270,7 @@ def create_product():
         description=data.get("description"),
         price=price,
         stock_quantity=stock_quantity,
+        minimum_stock=minimum_stock,
         is_active=is_active,
     )
 
@@ -236,6 +327,19 @@ def update_product(product_id):
 
         product.stock_quantity = data["stock_quantity"]
 
+    if "minimum_stock" in data:
+        if not isinstance(data["minimum_stock"], int):
+            return jsonify({
+                "error": "minimum_stock must be an integer"
+            }), 400
+
+        if data["minimum_stock"] < 0:
+            return jsonify({
+                "error": "minimum_stock cannot be negative"
+            }), 400
+
+        product.minimum_stock = data["minimum_stock"]
+
     if "description" in data:
         product.description = data["description"]
 
@@ -253,13 +357,33 @@ def update_product(product_id):
 
 
 @main.delete("/products/<int:product_id>")
-def deactivate_product(product_id):
-    product = db.get_or_404(Product, product_id)
-    product.is_active = False
+def delete_product(product_id):
+    product = Product.query.get_or_404(product_id)
 
+    product.is_active = False
     db.session.commit()
 
-    return jsonify(product_to_dict(product))
+    return jsonify({
+        "id": product.id,
+        "sku": product.sku,
+        "name": product.name,
+        "price": str(product.price),
+        "description": product.description,
+        "stock_quantity": product.stock_quantity,
+        "is_active": product.is_active,
+    }), 200
+
+
+@main.delete("/products/<int:product_id>/permanent")
+def permanently_delete_product(product_id):
+    product = Product.query.get_or_404(product_id)
+
+    db.session.delete(product)
+    db.session.commit()
+
+    return jsonify({
+        "message": "Produto excluído definitivamente."
+    }), 200
 
 
 @main.get("/customers")
@@ -652,6 +776,7 @@ def list_stock_movements(product_id):
         for movement in movements
     ])
 
+
 @main.post("/purchases/<int:purchase_id>/receive")
 def receive_purchase_route(purchase_id):
     purchase = db.session.get(Purchase, purchase_id)
@@ -992,3 +1117,126 @@ def cancel_purchase_route(purchase_id):
         return jsonify({"error": str(exc)}), 400
 
     return jsonify(purchase_to_dict(purchase))
+
+FLEET_VEHICLE_STATUSES = {
+    "AVAILABLE",
+    "IN_USE",
+    "MAINTENANCE",
+    "INACTIVE",
+}
+
+
+def fleet_vehicle_to_dict(vehicle):
+    return {
+        "id": vehicle.id,
+        "plate": vehicle.plate,
+        "vehicle_type": vehicle.vehicle_type,
+        "brand": vehicle.brand,
+        "model": vehicle.model,
+        "manufacture_year": vehicle.manufacture_year,
+        "capacity_kg": (
+            float(vehicle.capacity_kg)
+            if vehicle.capacity_kg is not None
+            else None
+        ),
+        "current_mileage": vehicle.current_mileage,
+        "status": vehicle.status,
+        "notes": vehicle.notes,
+        "created_at": (
+            vehicle.created_at.isoformat()
+            if vehicle.created_at
+            else None
+        ),
+        "updated_at": (
+            vehicle.updated_at.isoformat()
+            if vehicle.updated_at
+            else None
+        ),
+    }
+
+
+@main.get("/fleet/vehicles")
+def list_fleet_vehicles():
+    vehicles = FleetVehicle.query.order_by(FleetVehicle.id.desc()).all()
+
+    return jsonify([
+        fleet_vehicle_to_dict(vehicle)
+        for vehicle in vehicles
+    ])
+
+
+@main.post("/fleet/vehicles")
+def create_fleet_vehicle():
+    data = request.get_json(silent=True) or {}
+
+    plate = str(data.get("plate", "")).strip().upper()
+    vehicle_type = str(data.get("vehicle_type", "")).strip()
+    status = str(data.get("status", "AVAILABLE")).strip().upper()
+
+    if not plate:
+        return jsonify({
+            "error": "A placa é obrigatória."
+        }), 400
+
+    if not vehicle_type:
+        return jsonify({
+            "error": "O tipo de veículo é obrigatório."
+        }), 400
+
+    if status not in FLEET_VEHICLE_STATUSES:
+        return jsonify({
+            "error": "Status de veículo inválido."
+        }), 400
+
+    existing_vehicle = FleetVehicle.query.filter_by(
+        plate=plate
+    ).first()
+
+    if existing_vehicle:
+        return jsonify({
+            "error": "Já existe um veículo com essa placa."
+        }), 409
+
+    current_mileage = data.get("current_mileage", 0)
+    capacity_kg = data.get("capacity_kg")
+    manufacture_year = data.get("manufacture_year")
+
+    try:
+        current_mileage = int(current_mileage)
+
+        if current_mileage < 0:
+            raise ValueError
+
+        if capacity_kg is not None:
+            capacity_kg = float(capacity_kg)
+
+            if capacity_kg < 0:
+                raise ValueError
+
+        if manufacture_year is not None:
+            manufacture_year = int(manufacture_year)
+
+    except (TypeError, ValueError):
+        return jsonify({
+            "error": (
+                "Quilometragem, capacidade e ano "
+                "devem conter valores válidos."
+            )
+        }), 400
+
+    vehicle = FleetVehicle(
+        plate=plate,
+        vehicle_type=vehicle_type,
+        brand=str(data.get("brand", "")).strip() or None,
+        model=str(data.get("model", "")).strip() or None,
+        manufacture_year=manufacture_year,
+        capacity_kg=capacity_kg,
+        current_mileage=current_mileage,
+        status=status,
+        notes=str(data.get("notes", "")).strip() or None,
+    )
+
+    db.session.add(vehicle)
+    db.session.commit()
+
+    return jsonify(fleet_vehicle_to_dict(vehicle)), 201
