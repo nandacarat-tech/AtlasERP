@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+
+{% block title %}Compras - AtlasERP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Compras</h2>
+        <p>Registre compras e acompanhe a entrada de produtos.</p>
+    </div>
+</div>
+
+<div id="message" class="message"></div>
+
+<div class="panel">
+    <h2>Nova compra</h2>
+
+    <form id="purchase-form">
+        <label>
+            Fornecedor
+            <select id="supplier-id" required>
+                <option value="">Selecione um fornecedor</option>
+            </select>
+        </label>
+
+        <button type="submit">Criar compra</button>
+    </form>
+</div>
+
+<div class="panel" id="items-panel" hidden>
+    <h2>Adicionar itens</h2>
+
+    <p>
+        Compra atual:
+        <strong id="current-purchase-id"></strong>
+    </p>
+
+    <div class="sale-item-form">
+        <label>
+            Produto
+            <select id="product-id">
+                <option value="">Selecione um produto</option>
+            </select>
+        </label>
+
+        <label>
+            Quantidade
+            <input id="quantity" type="number" min="1" value="1">
+        </label>
+
+        <label>
+            Custo unitário
+            <input id="unit-cost" type="number" min="0.01" step="0.01">
+        </label>
+
+        <button id="add-item-button" type="button">
+            Adicionar item
+        </button>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th>Quantidade</th>
+                    <th>Custo unitário</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody id="items-table"></tbody>
+        </table>
+    </div>
+
+    <p class="sale-total">
+        Total:
+        <strong>R$ <span id="current-total">0,00</span></strong>
+    </p>
+
+    <button id="finish-button" class="secondary" type="button">
+        Fechar edição
+    </button>
+</div>
+
+<div class="panel">
+    <div class="page-header">
+        <h2>Compras registradas</h2>
+
+        <button id="reload-button" class="secondary" type="button">
+            ↻ Atualizar dados
+        </button>
+    </div>
+
+    <div class="filters">
+        <select id="status-filter">
+            <option value="">Todos os status</option>
+            <option value="OPEN">Abertas</option>
+            <option value="RECEIVED">Recebidas</option>
+            <option value="CANCELED">Canceladas</option>
+        </select>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Fornecedor</th>
+                    <th>Status</th>
+                    <th>Itens</th>
+                    <th>Total</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="purchases-table"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const message = document.getElementById("message");
+    const purchaseForm = document.getElementById("purchase-form");
+    const supplierSelect = document.getElementById("supplier-id");
+    const productSelect = document.getElementById("product-id");
+    const quantityInput = document.getElementById("quantity");
+    const unitCostInput = document.getElementById("unit-cost");
+    const itemsPanel = document.getElementById("items-panel");
+    const currentPurchaseId = document.getElementById("current-purchase-id");
+    const currentTotal = document.getElementById("current-total");
+    const itemsTable = document.getElementById("items-table");
+    const purchasesTable = document.getElementById("purchases-table");
+    const statusFilter = document.getElementById("status-filter");
+
+    let suppliers = [];
+    let products = [];
+    let activePurchase = null;
+
+    function showMessage(text, type = "success") {
+        message.textContent = text;
+        message.className = `message ${type}`;
+
+        setTimeout(() => {
+            message.className = "message";
+        }, 3000);
+    }
+
+    function money(value) {
+        return Number(value || 0).toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    function supplierName(id) {
+        const supplier = suppliers.find(item => item.id === id);
+        return supplier ? supplier.name : `Fornecedor #${id}`;
+    }
+
+    function productName(id) {
+        const product = products.find(item => item.id === id);
+        return product ? product.name : `Produto #${id}`;
+    }
+
+    async function loadOptions() {
+        const [suppliersResponse, productsResponse] = await Promise.all([
+            fetch("/suppliers", { cache: "no-store" }),
+            fetch("/products", { cache: "no-store" })
+        ]);
+
+        suppliers = await suppliersResponse.json();
+        products = await productsResponse.json();
+
+        supplierSelect.innerHTML = `
+            <option value="">Selecione um fornecedor</option>
+            ${suppliers
+                .filter(supplier => supplier.is_active)
+                .map(supplier => `
+                    <option value="${supplier.id}">
+                        ${supplier.name} - ${supplier.document}
+                    </option>
+                `).join("")}
+        `;
+
+        productSelect.innerHTML = `
+            <option value="">Selecione um produto</option>
+            ${products
+                .filter(product => product.is_active)
+                .map(product => `
+                    <option value="${product.id}">
+                        ${product.name}
+                    </option>
+                `).join("")}
+        `;
+    }
+
+    function renderActivePurchase() {
+        if (!activePurchase) {
+            itemsPanel.hidden = true;
+            return;
+        }
+
+        itemsPanel.hidden = false;
+        currentPurchaseId.textContent = `#${activePurchase.id}`;
+        currentTotal.textContent = money(activePurchase.total_amount);
+
+        if (!activePurchase.items.length) {
+            itemsTable.innerHTML = `
+                <tr>
+                    <td colspan="4" class="empty">
+                        Nenhum item adicionado.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        itemsTable.innerHTML = activePurchase.items.map(item => `
+            <tr>
+                <td>${productName(item.product_id)}</td>
+                <td>${item.quantity}</td>
+                <td>R$ ${money(item.unit_cost)}</td>
+                <td>R$ ${money(item.subtotal)}</td>
+            </tr>
+        `).join("");
+    }
+
+    async function createPurchase(event) {
+        event.preventDefault();
+
+        const supplierId = Number(supplierSelect.value);
+
+        if (!supplierId) {
+            showMessage("Selecione um fornecedor.", "error");
+            return;
+        }
+
+        const response = await fetch("/purchases", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                supplier_id: supplierId
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            showMessage(data.error || "Erro ao criar compra.", "error");
+            return;
+        }
+
+        activePurchase = data;
+        showMessage("Compra criada. Agora adicione os itens.");
+        renderActivePurchase();
+        await loadPurchases();
+    }
+
+    async function addPurchaseItem() {
+        if (!activePurchase) {
+            showMessage("Crie uma compra primeiro.", "error");
+            return;
+        }
+
+        const productId = Number(productSelect.value);
+        const quantity = Number(quantityInput.value);
+        const unitCost = Number(unitCostInput.value);
+
+        if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
+            showMessage("Informe produto e quantidade válidos.", "error");
+            return;
+        }
+
+        if (!unitCost || unitCost <= 0) {
+            showMessage("Informe um custo unitário válido.", "error");
+            return;
+        }
+
+        const response = await fetch(
+            `/purchases/${activePurchase.id}/items`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    product_id: productId,
+                    quantity: quantity,
+                    unit_cost: unitCost
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            showMessage(data.error || "Erro ao adicionar item.", "error");
+            return;
+        }
+
+        activePurchase = data;
+        productSelect.value = "";
+        quantityInput.value = 1;
+        unitCostInput.value = "";
+        renderActivePurchase();
+        await loadPurchases();
+        showMessage("Item adicionado à compra.");
+    }
+
+    async function loadPurchases() {
+        const status = statusFilter.value;
+        const url = status
+            ? `/purchases?status=${encodeURIComponent(status)}`
+            : "/purchases";
+
+        const response = await fetch(url, { cache: "no-store" });
+        const data = await response.json();
+
+        if (!response.ok) {
+            showMessage(data.error || "Erro ao carregar compras.", "error");
+            return;
+        }
+
+        purchasesTable.innerHTML = data.length
+            ? data.map(purchase => `
+                <tr>
+                    <td>#${purchase.id}</td>
+                    <td>${supplierName(purchase.supplier_id)}</td>
+                    <td>${purchase.status}</td>
+                    <td>${purchase.items.length}</td>
+                    <td>R$ ${money(purchase.total_amount)}</td>
+                    <td>
+                        <button
+                            type="button"
+                            class="secondary"
+                            onclick="openPurchase(${purchase.id})"
+                        >
+                            Abrir
+                        </button>
+                    </td>
+                </tr>
+            `).join("")
+            : `
+                <tr>
+                    <td colspan="6" class="empty">
+                        Nenhuma compra encontrada.
+                    </td>
+                </tr>
+            `;
+    }
+
+    async function openPurchase(id) {
+        const response = await fetch(`/purchases/${id}`, {
+            cache: "no-store"
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            showMessage(data.error || "Erro ao abrir compra.", "error");
+            return;
+        }
+
+        activePurchase = data;
+        supplierSelect.value = data.supplier_id;
+        renderActivePurchase();
+    }
+
+    purchaseForm.addEventListener("submit", createPurchase);
+
+    document
+        .getElementById("add-item-button")
+        .addEventListener("click", addPurchaseItem);
+
+    document
+        .getElementById("finish-button")
+        .addEventListener("click", () => {
+            activePurchase = null;
+            renderActivePurchase();
+        });
+
+    document
+        .getElementById("reload-button")
+        .addEventListener("click", async () => {
+            await loadOptions();
+            await loadPurchases();
+        });
+
+    statusFilter.addEventListener("change", loadPurchases);
+
+    async function initialize() {
+        await loadOptions();
+        await loadPurchases();
+    }
+
+    initialize();
+</script>
+{% endblock %}

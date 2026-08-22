@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}Fornecedores - AtlasERP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Fornecedores</h2>
+        <p>Cadastre e gerencie seus fornecedores.</p>
+    </div>
+</div>
+
+<div id="message" class="message"></div>
+
+<div class="panel">
+    <h2>Novo fornecedor</h2>
+
+    <form id="supplier-form">
+        <div class="form-grid">
+            <label>
+                Nome
+                <input id="name" type="text" maxlength="120" required>
+            </label>
+
+            <label>
+                CPF/CNPJ
+                <input id="document" type="text" maxlength="20" required>
+            </label>
+
+            <label>
+                E-mail
+                <input id="email" type="email" maxlength="120">
+            </label>
+
+            <label>
+                Telefone
+                <input id="phone" type="text" maxlength="30">
+            </label>
+        </div>
+
+        <div class="actions">
+            <button type="submit">Cadastrar fornecedor</button>
+            <button id="clear-button" class="secondary" type="button">
+                Limpar
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="panel">
+    <div class="page-header">
+        <h2>Fornecedores cadastrados</h2>
+
+        <button id="reload-button" class="secondary" type="button">
+            ↻ Atualizar dados
+        </button>
+    </div>
+
+    <div class="filters">
+        <input
+            id="search-input"
+            type="search"
+            placeholder="Buscar por nome, documento ou e-mail"
+        >
+
+        <select id="status-filter">
+            <option value="all">Todos</option>
+            <option value="active">Ativos</option>
+            <option value="inactive">Inativos</option>
+        </select>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Documento</th>
+                    <th>E-mail</th>
+                    <th>Telefone</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+
+            <tbody id="suppliers-table"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById("supplier-form");
+    const table = document.getElementById("suppliers-table");
+    const message = document.getElementById("message");
+    const searchInput = document.getElementById("search-input");
+    const statusFilter = document.getElementById("status-filter");
+    const reloadButton = document.getElementById("reload-button");
+    const clearButton = document.getElementById("clear-button");
+
+    let suppliers = [];
+
+    function showMessage(text, type = "success") {
+        message.textContent = text;
+        message.className = `message ${type}`;
+
+        setTimeout(() => {
+            message.className = "message";
+        }, 3000);
+    }
+
+    function renderSuppliers() {
+        const search = searchInput.value.trim().toLowerCase();
+        const status = statusFilter.value;
+
+        const filtered = suppliers.filter(supplier => {
+            const matchesSearch =
+                String(supplier.name || "").toLowerCase().includes(search) ||
+                String(supplier.document || "").toLowerCase().includes(search) ||
+                String(supplier.email || "").toLowerCase().includes(search);
+
+            const matchesStatus =
+                status === "all" ||
+                (status === "active" && supplier.is_active) ||
+                (status === "inactive" && !supplier.is_active);
+
+            return matchesSearch && matchesStatus;
+        });
+
+        if (!filtered.length) {
+            table.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty">
+                        Nenhum fornecedor encontrado.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        table.innerHTML = filtered.map(supplier => `
+            <tr>
+                <td>${supplier.name || ""}</td>
+                <td>${supplier.document || ""}</td>
+                <td>${supplier.email || ""}</td>
+                <td>${supplier.phone || ""}</td>
+                <td>
+                    <span class="status ${
+                        supplier.is_active ? "active" : "inactive"
+                    }">
+                        ${supplier.is_active ? "Ativo" : "Inativo"}
+                    </span>
+                </td>
+                <td>
+                    <button
+                        type="button"
+                        class="secondary"
+                        onclick="toggleSupplier(
+                            ${supplier.id},
+                            ${supplier.is_active}
+                        )"
+                    >
+                        ${supplier.is_active ? "Desativar" : "Ativar"}
+                    </button>
+                </td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadSuppliers() {
+        reloadButton.disabled = true;
+        reloadButton.textContent = "Atualizando...";
+
+        try {
+            const response = await fetch("/suppliers", {
+                cache: "no-store"
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error || "Não foi possível carregar os fornecedores."
+                );
+            }
+
+            suppliers = data;
+            renderSuppliers();
+        } catch (error) {
+            showMessage(error.message, "error");
+        } finally {
+            reloadButton.disabled = false;
+            reloadButton.textContent = "↻ Atualizar dados";
+        }
+    }
+
+    async function createSupplier(event) {
+        event.preventDefault();
+
+        const payload = {
+            name: document.getElementById("name").value.trim(),
+            document: document.getElementById("document").value.trim(),
+            email: document.getElementById("email").value.trim() || null,
+            phone: document.getElementById("phone").value.trim() || null
+        };
+
+        try {
+            const response = await fetch("/suppliers", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error || "Não foi possível cadastrar o fornecedor."
+                );
+            }
+
+            showMessage("Fornecedor cadastrado com sucesso.");
+            form.reset();
+            await loadSuppliers();
+        } catch (error) {
+            showMessage(error.message, "error");
+        }
+    }
+
+    async function toggleSupplier(id, currentStatus) {
+        try {
+            const response = await fetch(`/suppliers/${id}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    is_active: !currentStatus
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error || "Não foi possível alterar o status."
+                );
+            }
+
+            showMessage("Status do fornecedor atualizado.");
+            await loadSuppliers();
+        } catch (error) {
+            showMessage(error.message, "error");
+        }
+    }
+
+    form.addEventListener("submit", createSupplier);
+    reloadButton.addEventListener("click", loadSuppliers);
+
+    clearButton.addEventListener("click", () => {
+        form.reset();
+    });
+
+    searchInput.addEventListener("input", renderSuppliers);
+    statusFilter.addEventListener("change", renderSuppliers);
+
+    loadSuppliers();
+</script>
+{% endblock %}

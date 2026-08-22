@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}Clientes - AtlasERP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Clientes</h2>
+        <p>Cadastre e acompanhe seus clientes.</p>
+    </div>
+</div>
+
+<div id="message" class="message"></div>
+
+<div class="panel">
+    <h2>Novo cliente</h2>
+
+    <form id="customer-form">
+        <div class="form-grid">
+            <label>
+                Nome
+                <input id="name" name="name" type="text" required>
+            </label>
+
+            <label>
+                CPF/CNPJ
+                <input id="document" name="document" type="text" required>
+            </label>
+
+            <label>
+                E-mail
+                <input id="email" name="email" type="email">
+            </label>
+
+            <label>
+                Telefone
+                <input id="phone" name="phone" type="text">
+            </label>
+        </div>
+
+        <div class="actions">
+            <button type="submit">Cadastrar cliente</button>
+
+            <button id="clear-button" class="secondary" type="button">
+                Limpar
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="panel">
+    <div class="page-header">
+        <h2>Clientes cadastrados</h2>
+
+        <button id="reload-button" class="secondary" type="button">
+            ↻ Atualizar dados
+        </button>
+    </div>
+
+    <div class="filters">
+        <input
+            id="search-input"
+            type="search"
+            placeholder="Buscar por nome, documento ou e-mail"
+        >
+
+        <select id="status-filter">
+            <option value="all">Todos</option>
+            <option value="active">Ativos</option>
+            <option value="inactive">Inativos</option>
+        </select>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Documento</th>
+                    <th>E-mail</th>
+                    <th>Telefone</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+
+            <tbody id="customers-table"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById("customer-form");
+    const table = document.getElementById("customers-table");
+    const message = document.getElementById("message");
+    const reloadButton = document.getElementById("reload-button");
+    const clearButton = document.getElementById("clear-button");
+    const searchInput = document.getElementById("search-input");
+    const statusFilter = document.getElementById("status-filter");
+
+    let allCustomers = [];
+
+    function showMessage(text, type = "success") {
+        message.textContent = text;
+        message.className = `message ${type}`;
+
+        setTimeout(() => {
+            message.className = "message";
+        }, 3000);
+    }
+
+    function renderCustomers(customers) {
+        const search = searchInput.value.trim().toLowerCase();
+        const status = statusFilter.value;
+
+        const filteredCustomers = customers.filter(customer => {
+            const name = String(customer.name || "").toLowerCase();
+            const document = String(customer.document || "").toLowerCase();
+            const email = String(customer.email || "").toLowerCase();
+
+            const matchesSearch =
+                name.includes(search) ||
+                document.includes(search) ||
+                email.includes(search);
+
+            const matchesStatus =
+                status === "all" ||
+                (status === "active" && customer.is_active) ||
+                (status === "inactive" && !customer.is_active);
+
+            return matchesSearch && matchesStatus;
+        });
+
+        if (!filteredCustomers.length) {
+            table.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty">
+                        Nenhum cliente encontrado.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        table.innerHTML = filteredCustomers.map(customer => `
+            <tr>
+                <td>${customer.name || ""}</td>
+                <td>${customer.document || ""}</td>
+                <td>${customer.email || ""}</td>
+                <td>${customer.phone || ""}</td>
+                <td>
+                    <span class="status ${
+                        customer.is_active ? "active" : "inactive"
+                    }">
+                        ${customer.is_active ? "Ativo" : "Inativo"}
+                    </span>
+                </td>
+                <td>
+                    <button
+                        type="button"
+                        class="secondary"
+                        onclick="toggleCustomer(
+                            ${customer.id},
+                            ${customer.is_active}
+                        )"
+                    >
+                        ${customer.is_active ? "Desativar" : "Ativar"}
+                    </button>
+                </td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadCustomers() {
+        reloadButton.disabled = true;
+        reloadButton.textContent = "Atualizando...";
+
+        try {
+            const response = await fetch("/customers", {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error("Não foi possível carregar os clientes.");
+            }
+
+            allCustomers = await response.json();
+            renderCustomers(allCustomers);
+        } catch (error) {
+            showMessage(error.message, "error");
+        } finally {
+            reloadButton.disabled = false;
+            reloadButton.textContent = "↻ Atualizar dados";
+        }
+    }
+
+    async function createCustomer(event) {
+        event.preventDefault();
+
+        const customer = {
+            name: document.getElementById("name").value.trim(),
+            document: document.getElementById("document").value.trim(),
+            email: document.getElementById("email").value.trim(),
+            phone: document.getElementById("phone").value.trim()
+        };
+
+        try {
+            const response = await fetch("/customers", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(customer)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error || "Não foi possível cadastrar o cliente."
+                );
+            }
+
+            showMessage("Cliente cadastrado com sucesso.");
+            form.reset();
+            await loadCustomers();
+        } catch (error) {
+            showMessage(error.message, "error");
+        }
+    }
+
+    async function toggleCustomer(id, currentStatus) {
+        try {
+            const response = await fetch(`/customers/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    is_active: !currentStatus
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error || "Não foi possível alterar o status."
+                );
+            }
+
+            showMessage("Status do cliente atualizado.");
+            await loadCustomers();
+        } catch (error) {
+            showMessage(error.message, "error");
+        }
+    }
+
+    form.addEventListener("submit", createCustomer);
+    reloadButton.addEventListener("click", loadCustomers);
+
+    clearButton.addEventListener("click", () => {
+        form.reset();
+    });
+
+    searchInput.addEventListener("input", () => {
+        renderCustomers(allCustomers);
+    });
+
+    statusFilter.addEventListener("change", () => {
+        renderCustomers(allCustomers);
+    });
+
+    loadCustomers();
+</script>
+{% endblock %}

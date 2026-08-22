@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+
+{% block title %}Vendas - AtlasERP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Vendas</h2>
+        <p>Registre vendas e acompanhe seus pedidos.</p>
+    </div>
+</div>
+
+<div id="message" class="message"></div>
+
+<div class="panel">
+    <h2>Nova venda</h2>
+
+    <form id="sale-form">
+        <label>
+            Cliente
+            <select id="customer-id" required>
+                <option value="">Selecione um cliente</option>
+            </select>
+        </label>
+
+        <div class="sale-item-form">
+            <label>
+                Produto
+                <select id="product-id">
+                    <option value="">Selecione um produto</option>
+                </select>
+            </label>
+
+            <label>
+                Quantidade
+                <input id="quantity" type="number" min="1" value="1">
+            </label>
+
+            <button id="add-item" type="button">Adicionar item</button>
+        </div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Quantidade</th>
+                        <th>Preço unitário</th>
+                        <th>Subtotal</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="items-table"></tbody>
+            </table>
+        </div>
+
+        <div class="sale-total">
+            Total estimado: R$ <strong id="sale-total">0,00</strong>
+        </div>
+
+        <button type="submit">Registrar venda</button>
+    </form>
+</div>
+
+<div class="panel">
+    <div class="page-header">
+        <h2>Vendas registradas</h2>
+        <button id="reload-button" class="secondary" type="button">
+            ↻ Atualizar dados
+        </button>
+    </div>
+
+    <div class="filters">
+        <select id="status-filter">
+            <option value="">Todos os status</option>
+            <option value="OPEN">Abertas</option>
+            <option value="CONFIRMED">Confirmadas</option>
+            <option value="CANCELLED">Canceladas</option>
+        </select>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="sales-table"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const message = document.getElementById("message");
+    const saleForm = document.getElementById("sale-form");
+    const customerSelect = document.getElementById("customer-id");
+    const productSelect = document.getElementById("product-id");
+    const quantityInput = document.getElementById("quantity");
+    const itemsTable = document.getElementById("items-table");
+    const saleTotal = document.getElementById("sale-total");
+    const salesTable = document.getElementById("sales-table");
+    const statusFilter = document.getElementById("status-filter");
+
+    let products = [];
+    let customers = [];
+    let saleItems = [];
+
+    function showMessage(text, type = "success") {
+        message.textContent = text;
+        message.className = `message ${type}`;
+        setTimeout(() => message.className = "message", 3000);
+    }
+
+    function money(value) {
+        return Number(value || 0).toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    async function loadOptions() {
+        const [customersResponse, productsResponse] = await Promise.all([
+            fetch("/customers", { cache: "no-store" }),
+            fetch("/products", { cache: "no-store" })
+        ]);
+
+        customers = await customersResponse.json();
+        products = await productsResponse.json();
+
+        customerSelect.innerHTML = `
+            <option value="">Selecione um cliente</option>
+            ${customers
+                .filter(customer => customer.is_active)
+                .map(customer => `
+                    <option value="${customer.id}">
+                        ${customer.name} - ${customer.document}
+                    </option>
+                `).join("")}
+        `;
+
+        productSelect.innerHTML = `
+            <option value="">Selecione um produto</option>
+            ${products
+                .filter(product => product.is_active && product.stock_quantity > 0)
+                .map(product => `
+                    <option value="${product.id}">
+                        ${product.name} - estoque: ${product.stock_quantity}
+                    </option>
+                `).join("")}
+        `;
+    }
+
+    function renderItems() {
+        itemsTable.innerHTML = saleItems.length
+            ? saleItems.map((item, index) => `
+                <tr>
+                    <td>${item.product.name}</td>
+                    <td>${item.quantity}</td>
+                    <td>R$ ${money(item.product.price)}</td>
+                    <td>R$ ${money(item.product.price * item.quantity)}</td>
+                    <td>
+                        <button
+                            type="button"
+                            class="secondary"
+                            onclick="removeItem(${index})"
+                        >
+                            Remover
+                        </button>
+                    </td>
+                </tr>
+            `).join("")
+            : `
+                <tr>
+                    <td colspan="5" class="empty">
+                        Nenhum item adicionado.
+                    </td>
+                </tr>
+            `;
+
+        const total = saleItems.reduce(
+            (sum, item) => sum + item.product.price * item.quantity,
+            0
+        );
+
+        saleTotal.textContent = money(total);
+    }
+
+    function addItem() {
+        const productId = Number(productSelect.value);
+        const quantity = Number(quantityInput.value);
+        const product = products.find(item => item.id === productId);
+
+        if (!product || !quantity || quantity < 1) {
+            showMessage("Selecione um produto e uma quantidade válida.", "error");
+            return;
+        }
+
+        if (saleItems.some(item => item.product.id === productId)) {
+            showMessage("Esse produto já foi adicionado.", "error");
+            return;
+        }
+
+        if (quantity > product.stock_quantity) {
+            showMessage("Quantidade maior que o estoque disponível.", "error");
+            return;
+        }
+
+        saleItems.push({ product, quantity });
+        productSelect.value = "";
+        quantityInput.value = 1;
+        renderItems();
+    }
+
+    function removeItem(index) {
+        saleItems.splice(index, 1);
+        renderItems();
+    }
+
+    async function createSale(event) {
+        event.preventDefault();
+
+        if (!customerSelect.value) {
+            showMessage("Selecione um cliente.", "error");
+            return;
+        }
+
+        if (!saleItems.length) {
+            showMessage("Adicione pelo menos um produto.", "error");
+            return;
+        }
+
+        const response = await fetch("/sales", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                customer_id: Number(customerSelect.value),
+                items: saleItems.map(item => ({
+                    product_id: item.product.id,
+                    quantity: item.quantity
+                }))
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            showMessage(data.error || "Erro ao registrar venda.", "error");
+            return;
+        }
+
+        showMessage("Venda registrada com sucesso.");
+        saleForm.reset();
+        saleItems = [];
+        renderItems();
+        await loadOptions();
+        await loadSales();
+    }
+
+    async function loadSales() {
+        const status = statusFilter.value;
+        const url = status
+            ? `/sales?status=${encodeURIComponent(status)}`
+            : "/sales";
+
+        const response = await fetch(url, { cache: "no-store" });
+        const sales = await response.json();
+
+        salesTable.innerHTML = sales.length
+            ? sales.map(sale => `
+                <tr>
+                    <td>#${sale.id}</td>
+                    <td>${sale.customer_id}</td>
+                    <td>${sale.status}</td>
+                    <td>R$ ${money(sale.total_amount)}</td>
+                    <td>
+                        ${sale.status === "OPEN" ? `
+                            <button
+                                type="button"
+                                onclick="confirmSale(${sale.id})"
+                            >
+                                Confirmar
+                            </button>
+                            <button
+                                type="button"
+                                class="secondary"
+                                onclick="cancelSale(${sale.id})"
+                            >
+                                Cancelar
+                            </button>
+                        ` : "-"}
+                    </td>
+                </tr>
+            `).join("")
+            : `
+                <tr>
+                    <td colspan="5" class="empty">
+                        Nenhuma venda encontrada.
+                    </td>
+                </tr>
+            `;
+    }
+
+    async function confirmSale(id) {
+        const response = await fetch(`/sales/${id}/confirm`, {
+            method: "POST"
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            showMessage(data.error || "Erro ao confirmar venda.", "error");
+            return;
+        }
+
+        showMessage("Venda confirmada.");
+        await loadSales();
+        await loadOptions();
+    }
+
+    async function cancelSale(id) {
+        const response = await fetch(`/sales/${id}/cancel`, {
+            method: "POST"
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            showMessage(data.error || "Erro ao cancelar venda.", "error");
+            return;
+        }
+
+        showMessage("Venda cancelada.");
+        await loadSales();
+    }
+
+    document.getElementById("add-item").addEventListener("click", addItem);
+    saleForm.addEventListener("submit", createSale);
+    statusFilter.addEventListener("change", loadSales);
+    document.getElementById("reload-button").addEventListener("click", async () => {
+        await loadOptions();
+        await loadSales();
+    });
+
+    renderItems();
+    loadOptions();
+    loadSales();
+</script>
+{% endblock %}
