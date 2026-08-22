@@ -1,10 +1,11 @@
-﻿from decimal import Decimal, InvalidOperation
+﻿from datetime import date
+from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, jsonify, request, render_template
 
 from app import db
 from app.customer_models import Customer
-from app.models import FleetVehicle, Product
+from app.models import FleetMaintenance,FleetVehicle, Product
 from app.sale_models import Sale, SaleItem
 from app.sale_status import (
     CANCELLED,
@@ -113,6 +114,65 @@ def purchase_to_dict(purchase):
             for item in purchase.items
         ],
     }
+
+
+def maintenance_to_dict(maintenance):
+    return {
+        "id": maintenance.id,
+        "vehicle_id": maintenance.vehicle_id,
+        "vehicle_plate": maintenance.vehicle.plate
+        if maintenance.vehicle
+        else None,
+        "maintenance_type": maintenance.maintenance_type,
+        "description": maintenance.description,
+        "workshop": maintenance.workshop,
+        "opened_at": maintenance.opened_at.isoformat()
+        if maintenance.opened_at
+        else None,
+        "scheduled_at": maintenance.scheduled_at.isoformat()
+        if maintenance.scheduled_at
+        else None,
+        "completed_at": maintenance.completed_at.isoformat()
+        if maintenance.completed_at
+        else None,
+        "mileage": maintenance.mileage,
+        "cost": str(maintenance.cost)
+        if maintenance.cost is not None
+        else None,
+        "status": maintenance.status,
+        "next_maintenance_at": maintenance.next_maintenance_at.isoformat()
+        if maintenance.next_maintenance_at
+        else None,
+        "notes": maintenance.notes,
+        "created_at": maintenance.created_at.isoformat()
+        if maintenance.created_at
+        else None,
+        "updated_at": maintenance.updated_at.isoformat()
+        if maintenance.updated_at
+        else None,
+    }
+
+
+def parse_optional_date(value, field_name):
+    if value in (None, ""):
+        return None
+
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise ValueError(
+            f"{field_name} deve estar no formato YYYY-MM-DD"
+        )
+
+
+def parse_optional_decimal(value, field_name):
+    if value in (None, ""):
+        return None
+
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        raise ValueError(f"{field_name} deve ser um número válido")
 
 
 @main.get("/")
@@ -1240,3 +1300,176 @@ def create_fleet_vehicle():
     db.session.commit()
 
     return jsonify(fleet_vehicle_to_dict(vehicle)), 201
+
+
+@main.get("/fleet/maintenances")
+def list_fleet_maintenances():
+    vehicle_id = request.args.get("vehicle_id", type=int)
+    status = request.args.get("status")
+
+    query = FleetMaintenance.query.order_by(
+        FleetMaintenance.opened_at.desc(),
+        FleetMaintenance.id.desc(),
+    )
+
+    if vehicle_id is not None:
+        query = query.filter_by(vehicle_id=vehicle_id)
+
+    if status:
+        query = query.filter_by(status=status.upper())
+
+    maintenances = query.all()
+
+    return jsonify([
+        maintenance_to_dict(maintenance)
+        for maintenance in maintenances
+    ])
+
+
+@main.post("/fleet/maintenances")
+def create_fleet_maintenance():
+    data = request.get_json(silent=True) or {}
+
+    required_fields = (
+        "vehicle_id",
+        "maintenance_type",
+        "description",
+    )
+
+    missing_fields = [
+        field for field in required_fields
+        if data.get(field) in (None, "")
+    ]
+
+    if missing_fields:
+        return jsonify({
+            "error": "Campos obrigatórios ausentes",
+            "fields": missing_fields,
+        }), 400
+
+    vehicle = db.session.get(FleetVehicle, data["vehicle_id"])
+
+    if vehicle is None:
+        return jsonify({
+            "error": "Veículo não encontrado",
+        }), 404
+
+    try:
+        maintenance = FleetMaintenance(
+            vehicle_id=vehicle.id,
+            maintenance_type=str(data["maintenance_type"]).upper(),
+            description=str(data["description"]).strip(),
+            workshop=data.get("workshop"),
+            scheduled_at=parse_optional_date(
+                data.get("scheduled_at"),
+                "scheduled_at",
+            ),
+            completed_at=parse_optional_date(
+                data.get("completed_at"),
+                "completed_at",
+            ),
+            mileage=data.get("mileage"),
+            cost=parse_optional_decimal(
+                data.get("cost"),
+                "cost",
+            ),
+            status=str(data.get("status") or "OPEN").upper(),
+            next_maintenance_at=parse_optional_date(
+                data.get("next_maintenance_at"),
+                "next_maintenance_at",
+            ),
+            notes=data.get("notes"),
+        )
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    db.session.add(maintenance)
+    db.session.commit()
+
+    return jsonify(maintenance_to_dict(maintenance)), 201
+
+
+@main.get("/fleet/maintenances/<int:maintenance_id>")
+def get_fleet_maintenance(maintenance_id):
+    maintenance = db.session.get(FleetMaintenance, maintenance_id)
+
+    if maintenance is None:
+        return jsonify({
+            "error": "Manutenção não encontrada",
+        }), 404
+
+    return jsonify(maintenance_to_dict(maintenance))
+
+
+@main.put("/fleet/maintenances/<int:maintenance_id>")
+def update_fleet_maintenance(maintenance_id):
+    maintenance = db.session.get(FleetMaintenance, maintenance_id)
+
+    if maintenance is None:
+        return jsonify({
+            "error": "Manutenção não encontrada",
+        }), 404
+
+    data = request.get_json(silent=True) or {}
+
+    try:
+        if "vehicle_id" in data:
+            vehicle = db.session.get(FleetVehicle, data["vehicle_id"])
+
+            if vehicle is None:
+                return jsonify({
+                    "error": "Veículo não encontrado",
+                }), 404
+
+            maintenance.vehicle_id = vehicle.id
+
+        if "maintenance_type" in data:
+            maintenance.maintenance_type = str(
+                data["maintenance_type"]
+            ).upper()
+
+        if "description" in data:
+            maintenance.description = str(data["description"]).strip()
+
+        if "workshop" in data:
+            maintenance.workshop = data["workshop"]
+
+        if "scheduled_at" in data:
+            maintenance.scheduled_at = parse_optional_date(
+                data["scheduled_at"],
+                "scheduled_at",
+            )
+
+        if "completed_at" in data:
+            maintenance.completed_at = parse_optional_date(
+                data["completed_at"],
+                "completed_at",
+            )
+
+        if "mileage" in data:
+            maintenance.mileage = data["mileage"]
+
+        if "cost" in data:
+            maintenance.cost = parse_optional_decimal(
+                data["cost"],
+                "cost",
+            )
+
+        if "status" in data:
+            maintenance.status = str(data["status"]).upper()
+
+        if "next_maintenance_at" in data:
+            maintenance.next_maintenance_at = parse_optional_date(
+                data["next_maintenance_at"],
+                "next_maintenance_at",
+            )
+
+        if "notes" in data:
+            maintenance.notes = data["notes"]
+
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    db.session.commit()
+
+    return jsonify(maintenance_to_dict(maintenance))
