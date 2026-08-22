@@ -1,0 +1,243 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Dashboard - AtlasERP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Visão geral</h2>
+</div>
+
+<div class="cards">
+    <div class="card">
+        <h3>Total de produtos</h3>
+        <div id="total-products" class="number">0</div>
+    </div>
+
+    <div class="card">
+        <h3>Produtos ativos</h3>
+        <div id="active-products" class="number">0</div>
+    </div>
+
+    <div class="card">
+        <h3>Estoque total</h3>
+        <div id="total-stock" class="number">0</div>
+    </div>
+
+    <div class="card">
+        <h3>Clientes</h3>
+        <div id="total-customers" class="number">0</div>
+    </div>
+
+    <div class="card">
+        <h3>Fornecedores</h3>
+        <div id="total-suppliers" class="number">0</div>
+    </div>
+
+    <div class="card">
+        <h3>Vendas</h3>
+        <div id="total-sales" class="number">0</div>
+    </div>
+
+    <div class="card">
+        <h3>Compras</h3>
+        <div id="total-purchases" class="number">0</div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="page-header">
+        <h2>Alertas operacionais</h2>
+    </div>
+
+    <div class="alerts-grid">
+        <div class="alert-card danger">
+            <h3>Sem estoque</h3>
+            <div class="number">
+                {{ out_of_stock_products|length }}
+            </div>
+            {% if out_of_stock_products %}
+                <ul>
+                    {% for product in out_of_stock_products %}
+                        <li>{{ product.name }} — {{ product.sku }}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>Nenhum produto sem estoque.</p>
+            {% endif %}
+        </div>
+
+        <div class="alert-card warning">
+            <h3>Estoque baixo</h3>
+            <div class="number">
+                {{ low_stock_products|length }}
+            </div>
+            {% if low_stock_products %}
+                <ul>
+                    {% for product in low_stock_products %}
+                        <li>
+                            {{ product.name }} —
+                            {{ product.stock_quantity }} unidade(s)
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>Nenhum produto com estoque baixo.</p>
+            {% endif %}
+        </div>
+
+        <div class="alert-card">
+            <h3>Produtos inativos</h3>
+            <div class="number">
+                {{ inactive_products|length }}
+            </div>
+            <p>Produtos desativados no cadastro.</p>
+        </div>
+
+        <div class="alert-card">
+            <h3>Vendas em aberto</h3>
+            <div class="number">
+                {{ open_sales|length }}
+            </div>
+            <p>Vendas aguardando confirmação.</p>
+        </div>
+
+        <div class="alert-card">
+            <h3>Compras em aberto</h3>
+            <div class="number">
+                {{ open_purchases|length }}
+            </div>
+            <p>Compras aguardando recebimento.</p>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="page-header">
+    <h2>Produtos cadastrados</h2>
+
+    <div class="actions">
+        <button id="reload-button" class="secondary" type="button">
+            ↻ Atualizar dados
+        </button>
+
+        <small id="last-update" style="color: #64748b;">
+            Ainda não atualizado
+        </small>
+    </div>
+</div>
+
+    <div id="message" class="message"></div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Nome</th>
+                    <th>Preço</th>
+                    <th>Estoque</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="products-table"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const table = document.getElementById("products-table");
+    const message = document.getElementById("message");
+
+    function showError(text) {
+        message.textContent = text;
+        message.className = "message error";
+    }
+
+    function formatPrice(value) {
+        return Number(value).toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL"
+        });
+    }
+
+    function renderProducts(products) {
+        const active = products.filter(product => product.is_active);
+        const stock = products.reduce(
+            (total, product) => total + Number(product.stock_quantity || 0),
+            0
+        );
+        document.getElementById("total-customers").textContent =
+            {{ customers|length }};
+ 
+        document.getElementById("total-suppliers").textContent =
+            {{ suppliers|length }};
+
+        document.getElementById("total-sales").textContent =
+            {{ sales|length }};
+
+        document.getElementById("total-purchases").textContent =
+            {{ purchases|length }};
+
+        document.getElementById("total-products").textContent = products.length;
+        document.getElementById("active-products").textContent = active.length;
+        document.getElementById("total-stock").textContent = stock;
+
+        table.innerHTML = products.map(product => `
+            <tr>
+                <td>${product.sku}</td>
+                <td>${product.name}</td>
+                <td>${formatPrice(product.price)}</td>
+                <td>${product.stock_quantity}</td>
+                <td>
+                    <span class="status ${product.is_active ? "active" : "inactive"}">
+                        ${product.is_active ? "Ativo" : "Inativo"}
+                    </span>
+                </td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadProducts() {
+    const button = document.getElementById("reload-button");
+    const lastUpdate = document.getElementById("last-update");
+
+    button.disabled = true;
+    button.textContent = "Atualizando...";
+
+    try {
+        const response = await fetch("/products", {
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error("Não foi possível carregar os produtos.");
+        }
+
+        const products = await response.json();
+        renderProducts(products);
+
+        const now = new Date().toLocaleTimeString("pt-BR");
+        lastUpdate.textContent = `Atualizado às ${now}`;
+
+        message.textContent = "Dados atualizados com sucesso.";
+        message.className = "message success";
+
+        setTimeout(() => {
+            message.className = "message";
+        }, 2500);
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        button.disabled = false;
+        button.textContent = "↻ Atualizar dados";
+    }
+}
+
+document
+    .getElementById("reload-button")
+    .addEventListener("click", loadProducts);
+
+document.addEventListener("DOMContentLoaded", loadProducts);
+</script>
+
+{% endblock %}

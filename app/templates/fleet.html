@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}Frota - AtlasERP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Frota</h2>
+        <p>Cadastre e acompanhe os veículos da operação.</p>
+    </div>
+
+    <button id="reload-button" class="secondary" type="button">
+        ↻ Atualizar dados
+    </button>
+</div>
+
+<div id="message" class="message"></div>
+
+<div class="panel">
+    <h2>Novo veículo</h2>
+
+    <form id="vehicle-form">
+        <div class="form-grid">
+            <label>
+                Placa
+                <input
+                    id="plate"
+                    name="plate"
+                    type="text"
+                    maxlength="10"
+                    required
+                    placeholder="ABC1D23"
+                >
+            </label>
+
+            <label>
+                Tipo de veículo
+                <input
+                    id="vehicle_type"
+                    name="vehicle_type"
+                    type="text"
+                    required
+                    placeholder="Caminhão, van, carro..."
+                >
+            </label>
+
+            <label>
+                Marca
+                <input id="brand" name="brand" type="text">
+            </label>
+
+            <label>
+                Modelo
+                <input id="model" name="model" type="text">
+            </label>
+
+            <label>
+                Ano de fabricação
+                <input
+                    id="manufacture_year"
+                    name="manufacture_year"
+                    type="number"
+                    min="1900"
+                    max="2100"
+                >
+            </label>
+
+            <label>
+                Capacidade em kg
+                <input
+                    id="capacity_kg"
+                    name="capacity_kg"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                >
+            </label>
+
+            <label>
+                Quilometragem atual
+                <input
+                    id="current_mileage"
+                    name="current_mileage"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value="0"
+                    required
+                >
+            </label>
+
+            <label>
+                Status
+                <select id="status" name="status">
+                    <option value="AVAILABLE">Disponível</option>
+                    <option value="IN_USE">Em uso</option>
+                    <option value="MAINTENANCE">Em manutenção</option>
+                    <option value="INACTIVE">Inativo</option>
+                </select>
+            </label>
+
+            <label>
+                Observações
+                <textarea id="notes" name="notes" rows="3"></textarea>
+            </label>
+        </div>
+
+        <div class="actions">
+            <button type="submit">Cadastrar veículo</button>
+
+            <button
+                id="clear-button"
+                class="secondary"
+                type="button"
+            >
+                Limpar
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="panel">
+    <div class="page-header">
+        <h2>Veículos cadastrados</h2>
+        <small id="last-update" style="color: #64748b;">
+            Ainda não atualizado
+        </small>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Placa</th>
+                    <th>Tipo</th>
+                    <th>Marca/modelo</th>
+                    <th>Capacidade</th>
+                    <th>Km atual</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody id="vehicles-table"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById("vehicle-form");
+    const table = document.getElementById("vehicles-table");
+    const message = document.getElementById("message");
+    const reloadButton = document.getElementById("reload-button");
+    const clearButton = document.getElementById("clear-button");
+    const lastUpdate = document.getElementById("last-update");
+
+    const statusLabels = {
+        AVAILABLE: "Disponível",
+        IN_USE: "Em uso",
+        MAINTENANCE: "Em manutenção",
+        INACTIVE: "Inativo"
+    };
+
+    function showMessage(text, type = "success") {
+        message.textContent = text;
+        message.className = `message ${type}`;
+
+        setTimeout(() => {
+            message.className = "message";
+        }, 3000);
+    }
+
+    function renderVehicles(vehicles) {
+        if (!vehicles.length) {
+            table.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty">
+                        Nenhum veículo encontrado.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        table.innerHTML = vehicles.map(vehicle => `
+            <tr>
+                <td>${vehicle.plate || ""}</td>
+                <td>${vehicle.vehicle_type || ""}</td>
+                <td>
+                    ${vehicle.brand || ""} ${vehicle.model || ""}
+                </td>
+                <td>${vehicle.capacity_kg || 0} kg</td>
+                <td>${vehicle.current_mileage || 0} km</td>
+                <td>
+                    ${statusLabels[vehicle.status] || vehicle.status}
+                </td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadVehicles() {
+        reloadButton.disabled = true;
+        reloadButton.textContent = "Atualizando...";
+
+        try {
+            const response = await fetch("/fleet/vehicles", {
+                cache: "no-store"
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    "Não foi possível carregar os veículos."
+                );
+            }
+
+            renderVehicles(data);
+
+            lastUpdate.textContent =
+                `Atualizado às ${new Date().toLocaleTimeString("pt-BR")}`;
+        } catch (error) {
+            showMessage(error.message, "error");
+        } finally {
+            reloadButton.disabled = false;
+            reloadButton.textContent = "↻ Atualizar dados";
+        }
+    }
+
+    async function createVehicle(event) {
+        event.preventDefault();
+
+        const vehicle = {
+            plate: document.getElementById("plate").value.trim(),
+            vehicle_type: document
+                .getElementById("vehicle_type")
+                .value.trim(),
+            brand: document.getElementById("brand").value.trim(),
+            model: document.getElementById("model").value.trim(),
+            manufacture_year: Number(
+                document.getElementById("manufacture_year").value
+            ) || null,
+            capacity_kg: Number(
+                document.getElementById("capacity_kg").value
+            ) || null,
+            current_mileage: Number(
+                document.getElementById("current_mileage").value
+            ) || 0,
+            status: document.getElementById("status").value,
+            notes: document.getElementById("notes").value.trim()
+        };
+
+        try {
+            const response = await fetch("/fleet/vehicles", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(vehicle)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    "Não foi possível cadastrar o veículo."
+                );
+            }
+
+            showMessage("Veículo cadastrado com sucesso.");
+            form.reset();
+            document.getElementById("current_mileage").value = 0;
+
+            await loadVehicles();
+        } catch (error) {
+            showMessage(error.message, "error");
+        }
+    }
+
+    form.addEventListener("submit", createVehicle);
+
+    reloadButton.addEventListener("click", loadVehicles);
+
+    clearButton.addEventListener("click", () => {
+        form.reset();
+        document.getElementById("current_mileage").value = 0;
+    });
+
+    loadVehicles();
+</script>
+{% endblock %}

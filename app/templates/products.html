@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+
+{% block title %}Produtos - AtlasERP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Produtos</h2>
+        <p>Cadastre e acompanhe os itens do seu estoque.</p>
+    </div>
+
+    <button id="reload-button" class="secondary" type="button">
+        ↻ Atualizar dados
+    </button>
+</div>
+
+<div id="message" class="message"></div>
+
+<div class="panel">
+    <h2>Novo produto</h2>
+
+    <form id="product-form">
+        <div class="form-grid">
+            <label>
+                Código
+                <input
+                    id="sku"
+                    name="sku"
+                    type="text"
+                    required
+                    placeholder="Ex.: PROD-001"
+                >
+            </label>
+
+            <label>
+                Nome
+                <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    required
+                    placeholder="Nome do produto"
+                >
+            </label>
+
+            <label>
+                Preço
+                <input
+                    id="price"
+                    name="price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    placeholder="0,00"
+                >
+            </label>
+
+            <label>
+                Quantidade em estoque
+                <input
+                    id="stock_quantity"
+                    name="stock_quantity"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value="0"
+                    required
+                >
+            </label>
+
+            <label>
+                Estoque mínimo
+                <input
+                    id="minimum_stock"
+                    name="minimum_stock"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value="0"
+                    required
+                >
+            </label>
+        </div>
+
+        <div class="actions">
+            <button type="submit">Cadastrar produto</button>
+
+            <button id="clear-button" class="secondary" type="button">
+                Limpar
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="panel">
+    <div class="page-header">
+        <h2>Produtos cadastrados</h2>
+
+        <small id="last-update" style="color: #64748b;">
+            Ainda não atualizado
+        </small>
+    </div>
+
+    <div class="filters">
+        <input
+            id="search-input"
+            type="search"
+            placeholder="Buscar por código ou nome"
+        >
+
+        <select id="status-filter">
+            <option value="all">Todos</option>
+            <option value="active">Ativos</option>
+            <option value="inactive">Inativos</option>
+        </select>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Nome</th>
+                    <th>Preço</th>
+                    <th>Estoque</th>
+                    <th>Estoque mínimo</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+
+            <tbody id="products-table"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById("product-form");
+    const table = document.getElementById("products-table");
+    const message = document.getElementById("message");
+    const reloadButton = document.getElementById("reload-button");
+    const clearButton = document.getElementById("clear-button");
+    const lastUpdate = document.getElementById("last-update");
+    const searchInput = document.getElementById("search-input");
+    const statusFilter = document.getElementById("status-filter");
+
+    let allProducts = [];
+
+    function showMessage(text, type = "success") {
+        message.textContent = text;
+        message.className = `message ${type}`;
+
+        setTimeout(() => {
+            message.className = "message";
+        }, 3000);
+    }
+
+    function formatPrice(value) {
+        return Number(value).toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL"
+        });
+    }
+
+    function renderProducts(products) {
+        const search = searchInput.value.trim().toLowerCase();
+        const status = statusFilter.value;
+
+        const filteredProducts = products.filter(product => {
+            const sku = String(product.sku || "").toLowerCase();
+            const name = String(product.name || "").toLowerCase();
+
+            const matchesSearch =
+                sku.includes(search) ||
+                name.includes(search);
+
+            const matchesStatus =
+                status === "all" ||
+                (status === "active" && product.is_active) ||
+                (status === "inactive" && !product.is_active);
+
+            return matchesSearch && matchesStatus;
+        });
+
+        if (!filteredProducts.length) {
+            table.innerHTML = `
+                <tr>
+                    <td colspan="7" class="empty">
+                        Nenhum produto encontrado.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        table.innerHTML = filteredProducts.map(product => `
+            <tr>
+                <td>${product.sku || ""}</td>
+                <td>${product.name || ""}</td>
+                <td>${formatPrice(product.price || 0)}</td>
+                <td>${product.stock_quantity || 0}</td>
+                <td>${product.minimum_stock || 0}</td>
+                <td>
+                    <span class="status ${
+                        product.is_active ? "active" : "inactive"
+                    }">
+                        ${product.is_active ? "Ativo" : "Inativo"}
+                    </span>
+                </td>
+                <td>
+                    <div class="actions">
+                        <button
+                            type="button"
+                            class="secondary"
+                            onclick="toggleProduct(
+                                ${product.id},
+                                ${product.is_active}
+                            )"
+                        >
+                            ${product.is_active ? "Desativar" : "Ativar"}
+                        </button>
+
+                        <button
+                            type="button"
+                            class="danger"
+                            onclick="permanentlyDeleteProduct(${product.id})"
+                        >
+                            Excluir definitivamente
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join("");
+    }
+
+    async function loadProducts() {
+        reloadButton.disabled = true;
+        reloadButton.textContent = "Atualizando...";
+
+        try {
+            const response = await fetch("/products", {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    "Não foi possível carregar os produtos."
+                );
+            }
+
+            const data = await response.json();
+
+            allProducts = Array.isArray(data)
+                ? data
+                : (data.products || []);
+
+            renderProducts(allProducts);
+
+            lastUpdate.textContent =
+                `Atualizado às ${new Date().toLocaleTimeString("pt-BR")}`;
+        } catch (error) {
+            showMessage(error.message, "error");
+        } finally {
+            reloadButton.disabled = false;
+            reloadButton.textContent = "↻ Atualizar dados";
+        }
+    }
+
+    async function createProduct(event) {
+        event.preventDefault();
+
+        const product = {
+            sku: document.getElementById("sku").value.trim(),
+            name: document.getElementById("name").value.trim(),
+            price: Number(
+                document.getElementById("price").value
+            ),
+            stock_quantity: Number(
+                document.getElementById("stock_quantity").value
+            ),
+            minimum_stock: Number(
+                document.getElementById("minimum_stock").value
+            )
+        };
+
+        try {
+            const response = await fetch("/products", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(product)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    "Não foi possível cadastrar o produto."
+                );
+            }
+
+            showMessage("Produto cadastrado com sucesso.");
+            form.reset();
+            document.getElementById("stock_quantity").value = 0;
+            document.getElementById("minimum_stock").value = 0;
+
+            await loadProducts();
+        } catch (error) {
+            showMessage(error.message, "error");
+        }
+    }
+
+    async function toggleProduct(id, currentStatus) {
+        try {
+            const response = await fetch(`/products/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    is_active: !currentStatus
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    "Não foi possível alterar o status."
+                );
+            }
+
+            showMessage("Status do produto atualizado.");
+            await loadProducts();
+        } catch (error) {
+            showMessage(error.message, "error");
+        }
+    }
+
+    async function permanentlyDeleteProduct(id) {
+        const confirmed = confirm(
+            "Esta ação removerá o produto definitivamente. " +
+            "Deseja continuar?"
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `/products/${id}/permanent`,
+                {
+                    method: "DELETE",
+                    headers: {
+                        "Accept": "application/json"
+                    }
+                }
+            );
+
+            const responseText = await response.text();
+            let data = {};
+
+            if (responseText) {
+                data = JSON.parse(responseText);
+            }
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    "Não foi possível excluir o produto."
+                );
+            }
+
+            showMessage("Produto excluído definitivamente.");
+            await loadProducts();
+        } catch (error) {
+            console.error("Erro ao excluir produto:", error);
+            showMessage(error.message, "error");
+        }
+    }
+
+    form.addEventListener("submit", createProduct);
+
+    reloadButton.addEventListener("click", loadProducts);
+
+    clearButton.addEventListener("click", () => {
+        form.reset();
+    });
+
+    searchInput.addEventListener("input", () => {
+        renderProducts(allProducts);
+    });
+
+    statusFilter.addEventListener("change", () => {
+        renderProducts(allProducts);
+    });
+
+    loadProducts();
+</script>
+{% endblock %}
