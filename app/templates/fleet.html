@@ -119,6 +119,7 @@
             <thead>
                 <tr>
                     <th>Veículo</th>
+                    <th>Descrição</th>
                     <th>Tipo</th>
                     <th>Oficina</th>
                     <th>Abertura</th>
@@ -133,42 +134,51 @@
 </section>
 
 <script>
-const vehicleForm = document.getElementById("vehicle-form");
 const vehicleTable = document.getElementById("vehicles-table");
 const vehicleStatus = document.getElementById("vehicle-status");
 const maintenanceTable = document.getElementById("maintenance-table");
 const maintenanceStatus = document.getElementById("maintenance-status");
 const maintenanceVehicle = document.getElementById("maintenance-vehicle");
+const vehicleForm = document.getElementById("vehicle-form");
+const maintenanceFilter = document.getElementById("maintenance-filter");
 const message = document.getElementById("message");
-
-function showMessage(text, error = false) {
-    message.textContent = text;
-    message.className = "message " + (error ? "error" : "success");
-}
 
 function escapeHtml(value) {
     return String(value ?? "")
-        .replaceAll("&", "&")
-        .replaceAll("<", "<")
-        .replaceAll(">", ">")
-        .replaceAll('"', """)
-        .replaceAll("'", "&#039;");
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
 }
 
 function statusLabel(status) {
-    return {
+    const labels = {
         AVAILABLE: "Disponível",
         IN_USE: "Em uso",
         MAINTENANCE: "Manutenção",
-        INACTIVE: "Inativo"
-    }[status] || status || "";
+        INACTIVE: "Inativo",
+        OPEN: "Aberta",
+        COMPLETED: "Concluída",
+        CANCELLED: "Cancelada"
+    };
+    return labels[status] || status || "";
+}
+
+function showMessage(text, error = false) {
+    message.textContent = text;
+    message.className = error ? "message error" : "message success";
 }
 
 async function loadVehicles() {
-    vehicleStatus.textContent = "Carregando veículos...";
-
     const response = await fetch("/fleet/vehicles");
-    const vehicles = await response.json();
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.error || "Erro ao carregar veículos.");
+    }
+
+    const vehicles = Array.isArray(data) ? data : data.vehicles || [];
 
     vehicleTable.innerHTML = vehicles.map(vehicle => `
         <tr>
@@ -179,7 +189,7 @@ async function loadVehicles() {
             <td>${escapeHtml(vehicle.manufacture_year)}</td>
             <td>${escapeHtml(vehicle.capacity_kg)}</td>
             <td>${escapeHtml(vehicle.current_mileage)}</td>
-            <td><span class="status">${escapeHtml(statusLabel(vehicle.status))}</span></td>
+            <td>${escapeHtml(statusLabel(vehicle.status))}</td>
             <td>${escapeHtml(vehicle.notes)}</td>
         </tr>
     `).join("");
@@ -190,33 +200,44 @@ async function loadVehicles() {
             `<option value="${vehicle.id}">${escapeHtml(vehicle.plate)} - ${escapeHtml(vehicle.model)}</option>`
         ).join("");
 
-    vehicleStatus.textContent = `${vehicles.length} veículo(s) encontrado(s).`;
+    vehicleStatus.textContent = vehicles.length
+        ? `${vehicles.length} veículo(s) carregado(s).`
+        : "Nenhum veículo cadastrado.";
 }
 
 async function loadMaintenances() {
-    maintenanceStatus.textContent = "Carregando manutenções...";
-
-    const query = maintenanceVehicle.value
-        ? "?vehicle_id=" + encodeURIComponent(maintenanceVehicle.value)
+    const selectedVehicle = maintenanceVehicle.value;
+    const query = selectedVehicle
+        ? `?vehicle_id=${encodeURIComponent(selectedVehicle)}`
         : "";
 
     const response = await fetch("/fleet/maintenances" + query);
-    const maintenances = await response.json();
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.error || "Erro ao carregar manutenções.");
+    }
+
+    const maintenances = Array.isArray(data)
+        ? data
+        : data.maintenances || [];
 
     maintenanceTable.innerHTML = maintenances.map(item => `
         <tr>
             <td>${escapeHtml(item.vehicle_plate)}</td>
+            <td>${escapeHtml(item.description)}</td>
             <td>${escapeHtml(item.maintenance_type)}</td>
             <td>${escapeHtml(item.workshop)}</td>
             <td>${escapeHtml(item.opened_at)}</td>
             <td>${escapeHtml(item.mileage)}</td>
             <td>${escapeHtml(item.cost)}</td>
-            <td>${escapeHtml(item.status)}</td>
+            <td>${escapeHtml(statusLabel(item.status))}</td>
         </tr>
     `).join("");
 
-    maintenanceStatus.textContent =
-        `${maintenances.length} manutenção(ões) encontrada(s).`;
+    maintenanceStatus.textContent = maintenances.length
+        ? `${maintenances.length} manutenção(ões) carregada(s).`
+        : "Nenhuma manutenção encontrada.";
 }
 
 vehicleForm.addEventListener("submit", async event => {
@@ -234,40 +255,54 @@ vehicleForm.addEventListener("submit", async event => {
         notes: document.getElementById("notes").value
     };
 
-    const response = await fetch("/fleet/vehicles", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload)
-    });
+    try {
+        const response = await fetch("/fleet/vehicles", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(payload)
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-        showMessage(data.error || "Não foi possível cadastrar o veículo.", true);
-        return;
+        if (!response.ok) {
+            throw new Error(data.error || "Erro ao cadastrar veículo.");
+        }
+
+        vehicleForm.reset();
+        document.getElementById("current_mileage").value = 0;
+        showMessage("Veículo cadastrado com sucesso.");
+        await loadVehicles();
+        await loadMaintenances();
+    } catch (error) {
+        showMessage(error.message, true);
     }
-
-    showMessage("Veículo cadastrado com sucesso.");
-    vehicleForm.reset();
-    document.getElementById("current_mileage").value = 0;
-    await loadVehicles();
-    await loadMaintenances();
 });
 
 document.getElementById("reload-button").addEventListener("click", async () => {
-    await loadVehicles();
-    await loadMaintenances();
+    try {
+        await loadVehicles();
+        await loadMaintenances();
+        showMessage("Dados atualizados.");
+    } catch (error) {
+        showMessage(error.message, true);
+    }
 });
 
-document.getElementById("maintenance-filter").addEventListener("submit", async event => {
+maintenanceFilter.addEventListener("submit", async event => {
     event.preventDefault();
-    await loadMaintenances();
+
+    try {
+        await loadMaintenances();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
 });
 
 Promise.all([loadVehicles(), loadMaintenances()])
     .catch(error => {
-        vehicleStatus.textContent = error.message;
-        maintenanceStatus.textContent = error.message;
+        vehicleStatus.textContent = "Erro: " + error.message;
+        maintenanceStatus.textContent = "Erro: " + error.message;
+        showMessage(error.message, true);
     });
 </script>
 {% endblock %}
