@@ -3,50 +3,271 @@
 {% block title %}Frota - AtlasERP{% endblock %}
 
 {% block content %}
-<h1>Frota</h1>
-<p>Tela de frota carregada.</p>
-
-<button id="reload-button">
-    Atualizar
-</button>
-
-<div id="status">
-    Carregando veículos...
+<div class="page-header">
+    <div>
+        <h2>Frota</h2>
+        <p>Cadastre veículos e acompanhe manutenções.</p>
+    </div>
+    <button id="reload-button" type="button">Atualizar</button>
 </div>
 
-<table>
-<thead>
-<tr>
-<th>Placa</th>
-<th>Tipo</th>
-<th>Marca</th>
-<th>Modelo</th>
-</tr>
-</thead>
-<tbody id="vehicles-table">
-</tbody>
-</table>
+<div id="message" class="message"></div>
+
+<section class="panel">
+    <h3>Novo veículo</h3>
+
+    <form id="vehicle-form">
+        <div class="form-grid">
+            <label>
+                Placa
+                <input id="plate" required>
+            </label>
+
+            <label>
+                Tipo
+                <input id="vehicle_type" required>
+            </label>
+
+            <label>
+                Marca
+                <input id="brand">
+            </label>
+
+            <label>
+                Modelo
+                <input id="model">
+            </label>
+
+            <label>
+                Ano de fabricação
+                <input id="manufacture_year" type="number" min="1900">
+            </label>
+
+            <label>
+                Capacidade (kg)
+                <input id="capacity_kg" type="number" min="0" step="0.01">
+            </label>
+
+            <label>
+                Quilometragem atual
+                <input id="current_mileage" type="number" min="0" value="0">
+            </label>
+
+            <label>
+                Status
+                <select id="status">
+                    <option value="AVAILABLE">Disponível</option>
+                    <option value="IN_USE">Em uso</option>
+                    <option value="MAINTENANCE">Manutenção</option>
+                    <option value="INACTIVE">Inativo</option>
+                </select>
+            </label>
+        </div>
+
+        <label>
+            Observações
+            <input id="notes">
+        </label>
+
+        <button type="submit">Cadastrar veículo</button>
+    </form>
+</section>
+
+<section class="panel">
+    <h3>Veículos cadastrados</h3>
+
+    <div id="vehicle-status" class="empty">Carregando veículos...</div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Placa</th>
+                    <th>Tipo</th>
+                    <th>Marca</th>
+                    <th>Modelo</th>
+                    <th>Ano</th>
+                    <th>Capacidade</th>
+                    <th>Quilometragem</th>
+                    <th>Status</th>
+                    <th>Observações</th>
+                </tr>
+            </thead>
+            <tbody id="vehicles-table"></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel">
+    <h3>Manutenções</h3>
+
+    <form id="maintenance-filter">
+        <label>
+            Veículo
+            <select id="maintenance-vehicle">
+                <option value="">Todos os veículos</option>
+            </select>
+        </label>
+
+        <button type="submit">Carregar manutenções</button>
+    </form>
+
+    <div id="maintenance-status" class="empty">Carregando manutenções...</div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Veículo</th>
+                    <th>Tipo</th>
+                    <th>Oficina</th>
+                    <th>Abertura</th>
+                    <th>Quilometragem</th>
+                    <th>Custo</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="maintenance-table"></tbody>
+        </table>
+    </div>
+</section>
 
 <script>
-const table = document.getElementById("vehicles-table");
-const status = document.getElementById("status");
-const button = document.getElementById("reload-button");
+const vehicleForm = document.getElementById("vehicle-form");
+const vehicleTable = document.getElementById("vehicles-table");
+const vehicleStatus = document.getElementById("vehicle-status");
+const maintenanceTable = document.getElementById("maintenance-table");
+const maintenanceStatus = document.getElementById("maintenance-status");
+const maintenanceVehicle = document.getElementById("maintenance-vehicle");
+const message = document.getElementById("message");
 
-async function loadVehicles() {
-    try {
-        const response = await fetch("/fleet/vehicles");
-        const data = await response.json();
-        const items = Array.isArray(data) ? data : data.vehicles || [];
-        table.innerHTML = items.map(function (vehicle) {
-            return "<tr><td>" + (vehicle.plate || "") + "</td><td>" + (vehicle.vehicle_type || "") + "</td><td>" + (vehicle.brand || "") + "</td><td>" + (vehicle.model || "") + "</td></tr>";
-        }).join("");
-        status.textContent = "Veículos carregados.";
-    } catch (error) {
-        status.textContent = error.message;
-    }
+function showMessage(text, error = false) {
+    message.textContent = text;
+    message.className = "message " + (error ? "error" : "success");
 }
 
-button.addEventListener("click", loadVehicles);
-loadVehicles();
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&")
+        .replaceAll("<", "<")
+        .replaceAll(">", ">")
+        .replaceAll('"', """)
+        .replaceAll("'", "&#039;");
+}
+
+function statusLabel(status) {
+    return {
+        AVAILABLE: "Disponível",
+        IN_USE: "Em uso",
+        MAINTENANCE: "Manutenção",
+        INACTIVE: "Inativo"
+    }[status] || status || "";
+}
+
+async function loadVehicles() {
+    vehicleStatus.textContent = "Carregando veículos...";
+
+    const response = await fetch("/fleet/vehicles");
+    const vehicles = await response.json();
+
+    vehicleTable.innerHTML = vehicles.map(vehicle => `
+        <tr>
+            <td>${escapeHtml(vehicle.plate)}</td>
+            <td>${escapeHtml(vehicle.vehicle_type)}</td>
+            <td>${escapeHtml(vehicle.brand)}</td>
+            <td>${escapeHtml(vehicle.model)}</td>
+            <td>${escapeHtml(vehicle.manufacture_year)}</td>
+            <td>${escapeHtml(vehicle.capacity_kg)}</td>
+            <td>${escapeHtml(vehicle.current_mileage)}</td>
+            <td><span class="status">${escapeHtml(statusLabel(vehicle.status))}</span></td>
+            <td>${escapeHtml(vehicle.notes)}</td>
+        </tr>
+    `).join("");
+
+    maintenanceVehicle.innerHTML =
+        '<option value="">Todos os veículos</option>' +
+        vehicles.map(vehicle =>
+            `<option value="${vehicle.id}">${escapeHtml(vehicle.plate)} - ${escapeHtml(vehicle.model)}</option>`
+        ).join("");
+
+    vehicleStatus.textContent = `${vehicles.length} veículo(s) encontrado(s).`;
+}
+
+async function loadMaintenances() {
+    maintenanceStatus.textContent = "Carregando manutenções...";
+
+    const query = maintenanceVehicle.value
+        ? "?vehicle_id=" + encodeURIComponent(maintenanceVehicle.value)
+        : "";
+
+    const response = await fetch("/fleet/maintenances" + query);
+    const maintenances = await response.json();
+
+    maintenanceTable.innerHTML = maintenances.map(item => `
+        <tr>
+            <td>${escapeHtml(item.vehicle_plate)}</td>
+            <td>${escapeHtml(item.maintenance_type)}</td>
+            <td>${escapeHtml(item.workshop)}</td>
+            <td>${escapeHtml(item.opened_at)}</td>
+            <td>${escapeHtml(item.mileage)}</td>
+            <td>${escapeHtml(item.cost)}</td>
+            <td>${escapeHtml(item.status)}</td>
+        </tr>
+    `).join("");
+
+    maintenanceStatus.textContent =
+        `${maintenances.length} manutenção(ões) encontrada(s).`;
+}
+
+vehicleForm.addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const payload = {
+        plate: document.getElementById("plate").value,
+        vehicle_type: document.getElementById("vehicle_type").value,
+        brand: document.getElementById("brand").value,
+        model: document.getElementById("model").value,
+        manufacture_year: document.getElementById("manufacture_year").value || null,
+        capacity_kg: document.getElementById("capacity_kg").value || null,
+        current_mileage: document.getElementById("current_mileage").value || 0,
+        status: document.getElementById("status").value,
+        notes: document.getElementById("notes").value
+    };
+
+    const response = await fetch("/fleet/vehicles", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showMessage(data.error || "Não foi possível cadastrar o veículo.", true);
+        return;
+    }
+
+    showMessage("Veículo cadastrado com sucesso.");
+    vehicleForm.reset();
+    document.getElementById("current_mileage").value = 0;
+    await loadVehicles();
+    await loadMaintenances();
+});
+
+document.getElementById("reload-button").addEventListener("click", async () => {
+    await loadVehicles();
+    await loadMaintenances();
+});
+
+document.getElementById("maintenance-filter").addEventListener("submit", async event => {
+    event.preventDefault();
+    await loadMaintenances();
+});
+
+Promise.all([loadVehicles(), loadMaintenances()])
+    .catch(error => {
+        vehicleStatus.textContent = error.message;
+        maintenanceStatus.textContent = error.message;
+    });
 </script>
 {% endblock %}
