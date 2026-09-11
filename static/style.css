@@ -139,6 +139,8 @@ nav.main-nav {
   background-color: #1e293b;
   border-bottom: 1px solid var(--border-color);
   padding: 0 32px;
+  position: relative;
+  z-index: 100;
 }
 
 nav.main-nav ul {
@@ -176,17 +178,19 @@ nav.main-nav ul li a.active {
 .dropdown-content {
   display: none;
   position: absolute;
-  top: 100%;
+  top: calc(100% - 2px);
   left: 0;
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-lg);
-  min-width: 180px;
-  z-index: 100;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  min-width: 220px;
+  z-index: 1000;
+  padding: 4px 0;
 }
 
-.dropdown:hover .dropdown-content {
+.dropdown:hover .dropdown-content,
+.dropdown-content:hover {
   display: block;
 }
 
