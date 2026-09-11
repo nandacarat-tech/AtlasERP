@@ -1,4 +1,4 @@
-﻿from decimal import Decimal
+from decimal import Decimal
 
 from app import db
 from app.customer_models import Customer
@@ -9,7 +9,7 @@ import pytest
 
 def create_sale_data():
     customer = Customer(
-        document="12345678900",
+        document="52998224725",
         name="Cliente da venda",
     )
 
@@ -266,7 +266,7 @@ def test_create_sale_does_not_change_stock_when_one_item_is_insufficient(
 ):
     with app.app_context():
         customer = Customer(
-            document="98765432100",
+            document="11144477735",
             name="Cliente atomicidade",
         )
 
@@ -322,7 +322,7 @@ def test_create_sale_does_not_change_stock_when_one_item_is_insufficient(
 def test_create_sale_with_multiple_items_updates_total_and_stock(client, app):
     with app.app_context():
         customer = Customer(
-            document="11223344556",
+            document="10000000019",
             name="Cliente múltiplos itens",
         )
 
@@ -406,7 +406,7 @@ def test_create_sale_with_multiple_items_updates_total_and_stock(client, app):
 def test_get_sale_returns_items_and_totals(client, app):
     with app.app_context():
         customer = Customer(
-            document="77777777777",
+            document="20000000027",
             name="Cliente consulta venda",
         )
 
@@ -463,7 +463,7 @@ def test_get_sale_returns_items_and_totals(client, app):
 def test_failed_sale_creation_does_not_persist_sale(client, app):
     with app.app_context():
         customer = Customer(
-            document="99999999999",
+            document="30000000035",
             name="Cliente falha de venda",
         )
         db.session.add(customer)
@@ -493,7 +493,7 @@ def test_failed_sale_creation_does_not_persist_sale(client, app):
 def test_failed_multi_item_sale_does_not_change_stock_or_persist_sale(client, app):
     with app.app_context():
         customer = Customer(
-            document="11111111111",
+            document="40000000043",
             name="Cliente rollback múltiplo",
         )
 
@@ -549,7 +549,7 @@ def test_failed_multi_item_sale_does_not_change_stock_or_persist_sale(client, ap
 def test_create_sale_rejects_duplicate_product_items(client, app):
     with app.app_context():
         customer = Customer(
-            document="22222222222",
+            document="50000000051",
             name="Cliente produto duplicado",
         )
         product = Product(
@@ -594,7 +594,7 @@ def test_create_sale_rejects_duplicate_product_items(client, app):
 def test_invalid_item_after_valid_item_does_not_persist_sale(client, app):
     with app.app_context():
         customer = Customer(
-            document="33333333333",
+            document="60000000060",
             name="Cliente validação completa",
         )
         product = Product(
@@ -868,7 +868,7 @@ def test_list_sales_paginated_does_not_mix_customers(client, app):
         first_customer_id, first_product_id = create_sale_data()
 
         second_customer = Customer(
-            document="88888888888",
+            document="00000000000191",
             name="Segundo cliente paginação",
         )
         db.session.add(second_customer)

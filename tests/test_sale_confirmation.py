@@ -1,4 +1,4 @@
-﻿from decimal import Decimal
+from decimal import Decimal
 
 from app import db
 from app.customer_models import Customer
@@ -10,7 +10,7 @@ import pytest
 
 def create_open_sale():
     customer = Customer(
-        document="55555555555",
+        document="52998224725",
         name="Cliente confirmação",
     )
 
@@ -62,7 +62,7 @@ def test_confirm_sale_decreases_stock(client, app):
 def test_confirm_sale_rejects_insufficient_stock(client, app):
     with app.app_context():
         customer = Customer(
-            document="66666666666",
+            document="11144477735",
             name="Cliente estoque insuficiente",
         )
 
@@ -112,7 +112,7 @@ def test_cancel_open_sale(client, app):
         "/customers",
         json={
             "name": "Cliente Cancelamento",
-            "document": "99999999999",
+            "document": "10000000019",
         },
     )
     customer_id = customer_response.get_json()["id"]
@@ -179,7 +179,7 @@ def test_cancel_nonexistent_sale_returns_not_found(client):
 def test_cancel_empty_sale_is_allowed_without_stock_change(client, app):
     with app.app_context():
         customer = Customer(
-            document="88888888888",
+            document="20000000027",
             name="Cliente venda vazia",
         )
         db.session.add(customer)
@@ -226,7 +226,7 @@ def test_confirm_cancelled_sale_is_rejected(client, app):
 def test_confirm_sale_does_not_allow_stock_to_become_negative(client, app):
     with app.app_context():
         customer = Customer(
-            document="99999999999",
+            document="30000000035",
             name="Cliente concorrência",
         )
         product = Product(
@@ -272,7 +272,7 @@ def test_confirm_sale_does_not_allow_stock_to_become_negative(client, app):
 def test_confirm_multi_item_sale_rolls_back_stock_on_failure(client, app):
     with app.app_context():
         customer = Customer(
-            document="88888888888",
+            document="40000000043",
             name="Cliente rollback confirmação",
         )
         first_product = Product(
@@ -335,7 +335,7 @@ def test_confirm_multi_item_sale_rolls_back_stock_on_failure(client, app):
 def test_confirm_sale_rejects_cancelled_sale(client, app):
     with app.app_context():
         customer = Customer(
-            document="77777777777",
+            document="50000000051",
             name="Cliente venda cancelada",
         )
         sale = Sale(
@@ -357,7 +357,7 @@ def test_confirm_sale_rejects_cancelled_sale(client, app):
 def test_cancel_sale_rejects_confirmed_sale(client, app):
     with app.app_context():
         customer = Customer(
-            document="66666666666",
+            document="60000000060",
             name="Cliente venda confirmada",
         )
         sale = Sale(
@@ -430,7 +430,7 @@ def test_list_stock_movements_returns_404_for_unknown_product(client):
 def test_confirm_sale_is_atomic_when_one_item_lacks_stock(client, app):
     with app.app_context():
         customer = Customer(
-            document="77777777777",
+            document="00000000000191",
             name="Cliente atomicidade",
         )
 

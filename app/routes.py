@@ -561,7 +561,14 @@ def create_customer():
             "error": "document and name are required"
         }), 400
 
-    if Customer.query.filter_by(document=data["document"]).first():
+    from app.validators import validate_document, validate_phone
+    is_valid_doc, formatted_doc, doc_err = validate_document(data["document"])
+    if not is_valid_doc:
+        return jsonify({
+            "error": doc_err
+        }), 400
+
+    if Customer.query.filter_by(document=formatted_doc).first():
         return jsonify({
             "error": "document already exists"
         }), 409
@@ -572,16 +579,22 @@ def create_customer():
                 "error": "email already exists"
             }), 409
 
-    customer = Customer(
-        document=data["document"],
-        name=data["name"],
-        email=data.get("email"),
-        phone=data.get("phone"),
-        is_active=data.get("is_active", True),
-    )
+    try:
+        customer = Customer(
+            document=data["document"],
+            name=data["name"],
+            email=data.get("email"),
+            phone=data.get("phone"),
+            is_active=data.get("is_active", True),
+        )
 
-    db.session.add(customer)
-    db.session.commit()
+        db.session.add(customer)
+        db.session.commit()
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({
+            "error": str(e)
+        }), 400
 
     return jsonify(customer_to_dict(customer)), 201
 
@@ -597,58 +610,71 @@ def update_customer(customer_id):
     customer = db.get_or_404(Customer, customer_id)
     data = request.get_json(silent=True) or {}
 
-    if "document" in data:
-        if not data["document"]:
-            return jsonify({
-                "error": "document cannot be empty"
-            }), 400
+    try:
+        if "document" in data:
+            if not data["document"]:
+                return jsonify({
+                    "error": "document cannot be empty"
+                }), 400
 
-        existing = Customer.query.filter(
-            Customer.document == data["document"],
-            Customer.id != customer.id,
-        ).first()
+            from app.validators import validate_document
+            is_valid_doc, formatted_doc, doc_err = validate_document(data["document"])
+            if not is_valid_doc:
+                return jsonify({
+                    "error": doc_err
+                }), 400
 
-        if existing:
-            return jsonify({
-                "error": "document already exists"
-            }), 409
-
-        customer.document = data["document"]
-
-    if "name" in data:
-        if not data["name"]:
-            return jsonify({
-                "error": "name cannot be empty"
-            }), 400
-
-        customer.name = data["name"]
-
-    if "email" in data:
-        if data["email"]:
             existing = Customer.query.filter(
-                Customer.email == data["email"],
+                Customer.document == formatted_doc,
                 Customer.id != customer.id,
             ).first()
 
             if existing:
                 return jsonify({
-                    "error": "email already exists"
+                    "error": "document already exists"
                 }), 409
 
-        customer.email = data["email"]
+            customer.document = data["document"]
 
-    if "phone" in data:
-        customer.phone = data["phone"]
+        if "name" in data:
+            if not data["name"]:
+                return jsonify({
+                    "error": "name cannot be empty"
+                }), 400
 
-    if "is_active" in data:
-        if not isinstance(data["is_active"], bool):
-            return jsonify({
-                "error": "is_active must be a boolean"
-            }), 400
+            customer.name = data["name"]
 
-        customer.is_active = data["is_active"]
+        if "email" in data:
+            if data["email"]:
+                existing = Customer.query.filter(
+                    Customer.email == data["email"],
+                    Customer.id != customer.id,
+                ).first()
 
-    db.session.commit()
+                if existing:
+                    return jsonify({
+                        "error": "email already exists"
+                    }), 409
+
+            customer.email = data["email"]
+
+        if "phone" in data:
+            customer.phone = data["phone"]
+
+        if "is_active" in data:
+            if not isinstance(data["is_active"], bool):
+                return jsonify({
+                    "error": "is_active must be a boolean"
+                }), 400
+
+            customer.is_active = data["is_active"]
+
+        db.session.commit()
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({
+            "error": str(e)
+        }), 400
 
     return jsonify(customer_to_dict(customer))
 

@@ -1,4 +1,4 @@
-﻿from decimal import Decimal
+from decimal import Decimal
 
 from app import create_app, db
 from app.config import TestingConfig
@@ -14,7 +14,7 @@ def test_sale_calculates_total():
         db.create_all()
 
         customer = Customer(
-            document="12345678900",
+            document="52998224725",
             name="Cliente da venda",
         )
 

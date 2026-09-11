@@ -67,7 +67,7 @@ def test_resolve_delivery_return_with_stock_restoration(client, app):
         # Criar cliente
         customer = Customer(
             name="Cliente Retorno",
-            document="999.888.777-66",
+            document="529.982.247-25",
             email="retorno@cliente.com"
         )
         db.session.add(customer)
