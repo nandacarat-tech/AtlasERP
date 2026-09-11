@@ -290,6 +290,26 @@ def fleet_page():
     return render_template("fleet.html")
 
 
+@main.get("/ui/fleet/vehicles")
+def fleet_vehicles_page():
+    return render_template("fleet_vehicles.html")
+
+
+@main.get("/ui/fleet/maintenances")
+def fleet_maintenances_page():
+    return render_template("fleet_maintenances.html")
+
+
+@main.get("/ui/fleet/drivers")
+def fleet_drivers_page():
+    return render_template("fleet_drivers.html")
+
+
+@main.get("/ui/fleet/routes")
+def fleet_routes_page():
+    return render_template("fleet_routes.html")
+
+
 @main.get("/ui/customers")
 def customers_page():
     return render_template("customers.html")
