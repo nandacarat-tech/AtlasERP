@@ -1,28 +1,68 @@
 {% extends "base.html" %}
 
-{% block title %}Produtos - AtlasERP{% endblock %}
+{% block title %}Produtos & Estoque - AtlasERP{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div>
-        <h2>Produtos</h2>
-        <p>Cadastre e acompanhe os itens do seu estoque.</p>
+        <h2>Gestão de Produtos & Estoque</h2>
+        <p>Cadastre, edite preços, controle níveis mínimos e acompanhe o capital parado em estoque.</p>
     </div>
 
-    <button id="reload-button" class="secondary" type="button">
-        ↻ Atualizar dados
+    <button id="reload-button" class="btn btn-secondary" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Atualizar dados
     </button>
 </div>
 
 <div id="message" class="message"></div>
 
-<div class="panel">
-    <h2>Novo produto</h2>
+<!-- KPI Cards do Estoque -->
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <div class="card" style="border-left: 4px solid var(--accent-indigo);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Total de Produtos</h3>
+        <div id="kpi-total-products" class="number" style="font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Itens no catálogo</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--success-text);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Estoque Disponível (OK)</h3>
+        <div id="kpi-ok-stock" class="number" style="color: var(--success-text); font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Prontos para venda</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--warning-text);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Estoque Baixo</h3>
+        <div id="kpi-low-stock" class="number" style="color: var(--warning-text); font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Necessita nova compra</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--danger-text);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Produtos Esgotados</h3>
+        <div id="kpi-out-stock" class="number" style="color: var(--danger-text); font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Estoque zerado</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--accent-cyan);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Capital em Estoque</h3>
+        <div id="kpi-total-value" class="number" style="color: var(--accent-cyan); font-size: 22px; font-weight: 700; margin: 6px 0;">R$ 0,00</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Valor de custo/venda parado</p>
+    </div>
+</div>
+
+<!-- Formulário Dinâmico: Cadastro e Edição -->
+<div class="panel" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 id="form-title" style="margin: 0;">Novo produto</h2>
+        <span id="edit-badge" class="badge badge-warning" style="display: none;">Modo de Edição</span>
+    </div>
 
     <form id="product-form">
+        <input type="hidden" id="product-id" value="">
+
         <div class="form-grid">
             <label>
-                Código
+                Código (SKU)
                 <input
                     id="sku"
                     name="sku"
@@ -33,7 +73,7 @@
             </label>
 
             <label>
-                Nome
+                Nome do Produto
                 <input
                     id="name"
                     name="name"
@@ -44,7 +84,7 @@
             </label>
 
             <label>
-                Preço
+                Preço de Venda (R$)
                 <input
                     id="price"
                     name="price"
@@ -57,7 +97,7 @@
             </label>
 
             <label>
-                Quantidade em estoque
+                Quantidade em Estoque
                 <input
                     id="stock_quantity"
                     name="stock_quantity"
@@ -70,7 +110,7 @@
             </label>
 
             <label>
-                Estoque mínimo
+                Estoque Mínimo (Alerta)
                 <input
                     id="minimum_stock"
                     name="minimum_stock"
@@ -83,50 +123,60 @@
             </label>
         </div>
 
-        <div class="actions">
-            <button type="submit">Cadastrar produto</button>
+        <div class="actions" style="margin-top: 16px;">
+            <button id="submit-button" class="btn" type="submit">Cadastrar produto</button>
 
-            <button id="clear-button" class="secondary" type="button">
+            <button id="clear-button" class="btn btn-secondary" type="button">
                 Limpar
+            </button>
+
+            <button id="cancel-edit-button" class="btn btn-secondary" type="button" style="display: none; background: var(--border-color);">
+                Cancelar Edição
             </button>
         </div>
     </form>
 </div>
 
+<!-- Tabela de Produtos Cadastrados -->
 <div class="panel">
-    <div class="page-header">
-        <h2>Produtos cadastrados</h2>
+    <div class="page-header" style="margin-bottom: 16px;">
+        <div>
+            <h2 style="margin: 0;">Produtos Cadastrados</h2>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Gerencie e acompanhe a movimentação de cada item.</p>
+        </div>
 
-        <small id="last-update" style="color: #64748b;">
+        <small id="last-update" style="color: var(--text-muted);">
             Ainda não atualizado
         </small>
     </div>
 
-    <div class="filters">
+    <div class="filters" style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
         <input
             id="search-input"
             type="search"
-            placeholder="Buscar por código ou nome"
+            placeholder="Buscar por código (SKU) ou nome..."
+            style="flex: 1; min-width: 200px;"
         >
 
-        <select id="status-filter">
-            <option value="all">Todos</option>
+        <select id="status-filter" style="min-width: 180px;">
+            <option value="all">Todos os Produtos</option>
             <option value="active">Ativos</option>
             <option value="inactive">Inativos</option>
+            <option value="need_replenishment">Precisa de Reposição</option>
         </select>
     </div>
 
     <div class="table-wrapper">
-        <table>
+        <table class="table">
             <thead>
                 <tr>
                     <th>Código</th>
-                    <th>Nome</th>
+                    <th>Nome do Produto</th>
                     <th>Preço</th>
                     <th>Estoque</th>
-                    <th>Estoque mínimo</th>
+                    <th>Nível de Estoque</th>
                     <th>Status</th>
-                    <th>Ações</th>
+                    <th style="text-align: right;">Ações</th>
                 </tr>
             </thead>
 
@@ -137,6 +187,12 @@
 
 <script>
     const form = document.getElementById("product-form");
+    const productIdInput = document.getElementById("product-id");
+    const formTitle = document.getElementById("form-title");
+    const editBadge = document.getElementById("edit-badge");
+    const submitButton = document.getElementById("submit-button");
+    const cancelEditButton = document.getElementById("cancel-edit-button");
+
     const table = document.getElementById("products-table");
     const message = document.getElementById("message");
     const reloadButton = document.getElementById("reload-button");
@@ -144,6 +200,12 @@
     const lastUpdate = document.getElementById("last-update");
     const searchInput = document.getElementById("search-input");
     const statusFilter = document.getElementById("status-filter");
+
+    const kpiTotalProducts = document.getElementById("kpi-total-products");
+    const kpiOkStock = document.getElementById("kpi-ok-stock");
+    const kpiLowStock = document.getElementById("kpi-low-stock");
+    const kpiOutStock = document.getElementById("kpi-out-stock");
+    const kpiTotalValue = document.getElementById("kpi-total-value");
 
     let allProducts = [];
 
@@ -153,7 +215,7 @@
 
         setTimeout(() => {
             message.className = "message";
-        }, 3000);
+        }, 3500);
     }
 
     function formatPrice(value) {
@@ -161,6 +223,38 @@
             style: "currency",
             currency: "BRL"
         });
+    }
+
+    function updateKPIs(products) {
+        const total = products.length;
+        let okCount = 0;
+        let lowCount = 0;
+        let outCount = 0;
+        let totalVal = 0;
+
+        products.forEach(p => {
+            if (!p.is_active) return;
+
+            const qty = p.stock_quantity || 0;
+            const min = p.minimum_stock || 0;
+            const price = Number(p.price || 0);
+
+            totalVal += qty * price;
+
+            if (qty === 0) {
+                outCount++;
+            } else if (qty <= min) {
+                lowCount++;
+            } else {
+                okCount++;
+            }
+        });
+
+        kpiTotalProducts.textContent = total;
+        kpiOkStock.textContent = okCount;
+        kpiLowStock.textContent = lowCount;
+        kpiOutStock.textContent = outCount;
+        kpiTotalValue.textContent = formatPrice(totalVal);
     }
 
     function renderProducts(products) {
@@ -171,14 +265,16 @@
             const sku = String(product.sku || "").toLowerCase();
             const name = String(product.name || "").toLowerCase();
 
-            const matchesSearch =
-                sku.includes(search) ||
-                name.includes(search);
+            const matchesSearch = sku.includes(search) || name.includes(search);
 
-            const matchesStatus =
-                status === "all" ||
-                (status === "active" && product.is_active) ||
-                (status === "inactive" && !product.is_active);
+            let matchesStatus = true;
+            if (status === "active") {
+                matchesStatus = product.is_active;
+            } else if (status === "inactive") {
+                matchesStatus = !product.is_active;
+            } else if (status === "need_replenishment") {
+                matchesStatus = product.is_active && (product.stock_quantity <= product.minimum_stock);
+            }
 
             return matchesSearch && matchesStatus;
         });
@@ -186,7 +282,7 @@
         if (!filteredProducts.length) {
             table.innerHTML = `
                 <tr>
-                    <td colspan="7" class="empty">
+                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">
                         Nenhum produto encontrado.
                     </td>
                 </tr>
@@ -194,44 +290,85 @@
             return;
         }
 
-        table.innerHTML = filteredProducts.map(product => `
-            <tr>
-                <td>${product.sku || ""}</td>
-                <td>${product.name || ""}</td>
-                <td>${formatPrice(product.price || 0)}</td>
-                <td>${product.stock_quantity || 0}</td>
-                <td>${product.minimum_stock || 0}</td>
-                <td>
-                    <span class="status ${
-                        product.is_active ? "active" : "inactive"
-                    }">
-                        ${product.is_active ? "Ativo" : "Inativo"}
-                    </span>
-                </td>
-                <td>
-                    <div class="actions">
-                        <button
-                            type="button"
-                            class="secondary"
-                            onclick="toggleProduct(
-                                ${product.id},
-                                ${product.is_active}
-                            )"
-                        >
-                            ${product.is_active ? "Desativar" : "Ativar"}
-                        </button>
+        table.innerHTML = filteredProducts.map(product => {
+            const qty = product.stock_quantity || 0;
+            const min = product.minimum_stock || 0;
 
-                        <button
-                            type="button"
-                            class="danger"
-                            onclick="permanentlyDeleteProduct(${product.id})"
-                        >
-                            Excluir definitivamente
-                        </button>
+            let stockProgressHtml = '';
+            if (qty === 0) {
+                stockProgressHtml = `
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="flex: 1; height: 8px; background: rgba(239, 68, 68, 0.2); border-radius: 4px; overflow: hidden;">
+                            <div style="width: 0%; height: 100%; background: var(--danger-text);"></div>
+                        </div>
+                        <span class="badge badge-danger">Esgotado</span>
                     </div>
-                </td>
-            </tr>
-        `).join("");
+                `;
+            } else if (qty <= min) {
+                stockProgressHtml = `
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="flex: 1; height: 8px; background: rgba(245, 158, 11, 0.2); border-radius: 4px; overflow: hidden;">
+                            <div style="width: 40%; height: 100%; background: var(--warning-text);"></div>
+                        </div>
+                        <span class="badge badge-warning">Estoque Baixo</span>
+                    </div>
+                `;
+            } else {
+                stockProgressHtml = `
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="flex: 1; height: 8px; background: rgba(16, 185, 129, 0.2); border-radius: 4px; overflow: hidden;">
+                            <div style="width: 100%; height: 100%; background: var(--success-text);"></div>
+                        </div>
+                        <span class="badge badge-success">Estoque Ok</span>
+                    </div>
+                `;
+            }
+
+            return `
+                <tr>
+                    <td><strong>${product.sku || ""}</strong></td>
+                    <td>${product.name || ""}</td>
+                    <td>${formatPrice(product.price || 0)}</td>
+                    <td><strong>${qty}</strong> unid. (Mín: ${min})</td>
+                    <td style="width: 200px;">${stockProgressHtml}</td>
+                    <td>
+                        <span class="status ${product.is_active ? "active" : "inactive"}">
+                            ${product.is_active ? "Ativo" : "Inativo"}
+                        </span>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: flex; justify-content: flex-end; gap: 6px; flex-wrap: wrap;">
+                            <button
+                                type="button"
+                                class="btn btn-secondary"
+                                style="padding: 4px 8px; font-size: 12px;"
+                                onclick="editProduct(${product.id})"
+                            >
+                                ✏️ Editar
+                            </button>
+
+                            <button
+                                type="button"
+                                class="btn btn-secondary"
+                                style="padding: 4px 8px; font-size: 12px;"
+                                onclick="toggleProduct(${product.id}, ${product.is_active})"
+                            >
+                                ${product.is_active ? "Desativar" : "Ativar"}
+                            </button>
+
+                            <button
+                                type="button"
+                                class="btn btn-danger"
+                                style="padding: 4px 8px; font-size: 12px;"
+                                onclick="permanentlyDeleteProduct(${product.id})"
+                            >
+                                Excluir
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join("");
     }
 
     async function loadProducts() {
@@ -244,21 +381,16 @@
             });
 
             if (!response.ok) {
-                throw new Error(
-                    "Não foi possível carregar os produtos."
-                );
+                throw new Error("Não foi possível carregar os produtos.");
             }
 
             const data = await response.json();
+            allProducts = Array.isArray(data) ? data : (data.products || []);
 
-            allProducts = Array.isArray(data)
-                ? data
-                : (data.products || []);
-
+            updateKPIs(allProducts);
             renderProducts(allProducts);
 
-            lastUpdate.textContent =
-                `Atualizado às ${new Date().toLocaleTimeString("pt-BR")}`;
+            lastUpdate.textContent = `Atualizado às ${new Date().toLocaleTimeString("pt-BR")}`;
         } catch (error) {
             showMessage(error.message, "error");
         } finally {
@@ -267,46 +399,75 @@
         }
     }
 
-    async function createProduct(event) {
+    function editProduct(id) {
+        const product = allProducts.find(p => p.id === id);
+        if (!product) return;
+
+        productIdInput.value = product.id;
+        document.getElementById("sku").value = product.sku || "";
+        document.getElementById("name").value = product.name || "";
+        document.getElementById("price").value = product.price || 0;
+        document.getElementById("stock_quantity").value = product.stock_quantity || 0;
+        document.getElementById("minimum_stock").value = product.minimum_stock || 0;
+
+        document.getElementById("sku").readOnly = true;
+
+        formTitle.textContent = `Editar Produto: ${product.name} (#${product.sku})`;
+        editBadge.style.display = "inline-block";
+        submitButton.textContent = "Salvar Alterações";
+        cancelEditButton.style.display = "inline-block";
+
+        window.scrollTo({ top: form.offsetTop - 80, behavior: "smooth" });
+    }
+
+    function resetFormState() {
+        form.reset();
+        productIdInput.value = "";
+        document.getElementById("sku").readOnly = false;
+        document.getElementById("stock_quantity").value = 0;
+        document.getElementById("minimum_stock").value = 0;
+
+        formTitle.textContent = "Novo produto";
+        editBadge.style.display = "none";
+        submitButton.textContent = "Cadastrar produto";
+        cancelEditButton.style.display = "none";
+    }
+
+    async function handleFormSubmit(event) {
         event.preventDefault();
 
-        const product = {
-            sku: document.getElementById("sku").value.trim(),
+        const id = productIdInput.value;
+        const isEditing = Boolean(id);
+
+        const payload = {
             name: document.getElementById("name").value.trim(),
-            price: Number(
-                document.getElementById("price").value
-            ),
-            stock_quantity: Number(
-                document.getElementById("stock_quantity").value
-            ),
-            minimum_stock: Number(
-                document.getElementById("minimum_stock").value
-            )
+            price: Number(document.getElementById("price").value),
+            stock_quantity: Number(document.getElementById("stock_quantity").value),
+            minimum_stock: Number(document.getElementById("minimum_stock").value)
         };
 
+        if (!isEditing) {
+            payload.sku = document.getElementById("sku").value.trim();
+        }
+
         try {
-            const response = await fetch("/products", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(product)
+            const url = isEditing ? `/products/${id}` : "/products";
+            const method = isEditing ? "PUT" : "POST";
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(
-                    data.error ||
-                    "Não foi possível cadastrar o produto."
-                );
+                throw new Error(data.error || "Não foi possível salvar o produto.");
             }
 
-            showMessage("Produto cadastrado com sucesso.");
-            form.reset();
-            document.getElementById("stock_quantity").value = 0;
-            document.getElementById("minimum_stock").value = 0;
-
+            showMessage(isEditing ? "Produto atualizado com sucesso!" : "Produto cadastrado com sucesso!");
+            resetFormState();
             await loadProducts();
         } catch (error) {
             showMessage(error.message, "error");
@@ -317,21 +478,14 @@
         try {
             const response = await fetch(`/products/${id}`, {
                 method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    is_active: !currentStatus
-                })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_active: !currentStatus })
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(
-                    data.error ||
-                    "Não foi possível alterar o status."
-                );
+                throw new Error(data.error || "Não foi possível alterar o status.");
             }
 
             showMessage("Status do produto atualizado.");
@@ -342,38 +496,21 @@
     }
 
     async function permanentlyDeleteProduct(id) {
-        const confirmed = confirm(
-            "Esta ação removerá o produto definitivamente. " +
-            "Deseja continuar?"
-        );
-
-        if (!confirmed) {
-            return;
-        }
+        const confirmed = confirm("Esta ação removerá o produto definitivamente do sistema. Deseja continuar?");
+        if (!confirmed) return;
 
         try {
-            const response = await fetch(
-                `/products/${id}/permanent`,
-                {
-                    method: "DELETE",
-                    headers: {
-                        "Accept": "application/json"
-                    }
-                }
-            );
+            const response = await fetch(`/products/${id}/permanent`, {
+                method: "DELETE",
+                headers: { "Accept": "application/json" }
+            });
 
             const responseText = await response.text();
             let data = {};
-
-            if (responseText) {
-                data = JSON.parse(responseText);
-            }
+            if (responseText) data = JSON.parse(responseText);
 
             if (!response.ok) {
-                throw new Error(
-                    data.error ||
-                    "Não foi possível excluir o produto."
-                );
+                throw new Error(data.error || "Não foi possível excluir o produto.");
             }
 
             showMessage("Produto excluído definitivamente.");
@@ -384,21 +521,13 @@
         }
     }
 
-    form.addEventListener("submit", createProduct);
-
+    form.addEventListener("submit", handleFormSubmit);
     reloadButton.addEventListener("click", loadProducts);
+    clearButton.addEventListener("click", resetFormState);
+    cancelEditButton.addEventListener("click", resetFormState);
 
-    clearButton.addEventListener("click", () => {
-        form.reset();
-    });
-
-    searchInput.addEventListener("input", () => {
-        renderProducts(allProducts);
-    });
-
-    statusFilter.addEventListener("change", () => {
-        renderProducts(allProducts);
-    });
+    searchInput.addEventListener("input", () => renderProducts(allProducts));
+    statusFilter.addEventListener("change", () => renderProducts(allProducts));
 
     loadProducts();
 </script>
