@@ -1,11 +1,11 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, jsonify, request, render_template
 
 from app import db
 from app.customer_models import Customer
-from app.models import Driver, FleetMaintenance, FleetVehicle, Product, Route
+from app.models import Driver, FleetMaintenance, FleetVehicle, Product, Route, DeliveryReturn
 from app.sale_models import Sale, SaleItem
 from app.sale_status import (
     CANCELLED,
@@ -2153,6 +2153,131 @@ def emit_financial_invoice(invoice_id):
 
     db.session.commit()
     return jsonify(invoice.to_dict())
+
+
+# --- Rotas da UI e API para Retorno de Entregas (Módulo Frota) ---
+
+@main.get("/ui/fleet/returns")
+def ui_fleet_returns():
+    return render_template("fleet_returns.html")
+
+
+@main.get("/api/fleet/returns")
+def list_delivery_returns():
+    status_filter = request.args.get("status")
+    reason_filter = request.args.get("reason")
+
+    query = DeliveryReturn.query
+    if status_filter:
+        query = query.filter(DeliveryReturn.status == status_filter.upper())
+    if reason_filter:
+        query = query.filter(DeliveryReturn.reason == reason_filter.upper())
+
+    returns = query.order_by(DeliveryReturn.id.desc()).all()
+    return jsonify([ret.to_dict() for ret in returns])
+
+
+@main.post("/api/fleet/returns")
+def create_delivery_return():
+    data = request.get_json(silent=True) or {}
+
+    customer_name = str(data.get("customer_name", "")).strip()
+    reason = str(data.get("reason", "")).strip().upper()
+
+    if not customer_name:
+        return jsonify({"error": "Nome do cliente é obrigatório."}), 400
+    if not reason:
+        return jsonify({"error": "Motivo da devolução/insucesso é obrigatório."}), 400
+
+    sale_id = data.get("sale_id")
+    route_id = data.get("route_id")
+    driver_id = data.get("driver_id")
+    vehicle_id = data.get("vehicle_id")
+
+    attempt_date_val = datetime.utcnow().date()
+    if data.get("attempt_date"):
+        try:
+            attempt_date_val = datetime.strptime(str(data["attempt_date"]), "%Y-%m-%d").date()
+        except ValueError:
+            pass
+
+    delivery_return = DeliveryReturn(
+        sale_id=sale_id if sale_id else None,
+        route_id=route_id if route_id else None,
+        driver_id=driver_id if driver_id else None,
+        vehicle_id=vehicle_id if vehicle_id else None,
+        customer_name=customer_name,
+        attempt_date=attempt_date_val,
+        reason=reason,
+        status=str(data.get("status", "PENDING_RETURN")).upper(),
+        action_taken=data.get("action_taken"),
+        notes=data.get("notes"),
+    )
+
+    db.session.add(delivery_return)
+    db.session.commit()
+
+    return jsonify(delivery_return.to_dict()), 201
+
+
+@main.post("/api/fleet/returns/<int:return_id>/resolve")
+def resolve_delivery_return(return_id):
+    delivery_return = db.session.get(DeliveryReturn, return_id)
+    if not delivery_return:
+        return jsonify({"error": "Ocorrência de entrega não encontrada."}), 404
+
+    data = request.get_json(silent=True) or {}
+    new_status = str(data.get("status", "")).strip().upper()
+    action_taken = data.get("action_taken")
+
+    if not new_status:
+        return jsonify({"error": "Novo status é obrigatório."}), 400
+
+    old_status = delivery_return.status
+    delivery_return.status = new_status
+    if action_taken is not None:
+        delivery_return.action_taken = action_taken
+
+    # Logística Reversa Automática: Se o status for alterado para RETURNED_TO_STOCK
+    if new_status == "RETURNED_TO_STOCK" and old_status != "RETURNED_TO_STOCK" and delivery_return.sale_id:
+        sale = db.session.get(Sale, delivery_return.sale_id)
+        if sale:
+            for item in sale.items:
+                product = db.session.get(Product, item.product_id)
+                if product:
+                    stock_before = product.stock_quantity
+                    product.stock_quantity += item.quantity
+                    stock_after = product.stock_quantity
+                    stock_movement = StockMovement(
+                        product_id=product.id,
+                        sale_id=sale.id,
+                        movement_type="IN",
+                        quantity=item.quantity,
+                        stock_before=stock_before,
+                        stock_after=stock_after,
+                    )
+                    db.session.add(stock_movement)
+
+    db.session.commit()
+    return jsonify(delivery_return.to_dict())
+
+
+@main.get("/api/fleet/returns/summary")
+def get_fleet_returns_summary():
+    total = DeliveryReturn.query.count()
+    pending = DeliveryReturn.query.filter_by(status="PENDING_RETURN").count()
+    returned_to_stock = DeliveryReturn.query.filter_by(status="RETURNED_TO_STOCK").count()
+    rescheduled = DeliveryReturn.query.filter_by(status="RESCHEDULED").count()
+    cancelled = DeliveryReturn.query.filter_by(status="CANCELLED").count()
+
+    return jsonify({
+        "total": total,
+        "pending": pending,
+        "returned_to_stock": returned_to_stock,
+        "rescheduled": rescheduled,
+        "cancelled": cancelled,
+    })
+
 
 
 

@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}Retorno de Entregas - AtlasERP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Controle de Retorno de Entregas (Logística Reversa)</h2>
+        <p style="color: var(--text-muted); font-size: 14px;">Gerenciamento de entregas mal-sucedidas, avarias, ausência de clientes e devoluções ao estoque.</p>
+    </div>
+    <div>
+        <button class="btn" onclick="openNewReturnModal()">+ Registrar Insucesso de Entrega</button>
+    </div>
+</div>
+
+<!-- Cards Estatísticos -->
+<div class="cards">
+    <div class="card">
+        <h3>Total de Ocorrências</h3>
+        <div class="number" id="total-returns">-</div>
+    </div>
+    <div class="card">
+        <h3>Pendente de Retorno ao Estoque</h3>
+        <div class="number" id="pending-returns" style="color: var(--warning-text);">-</div>
+    </div>
+    <div class="card">
+        <h3>Devolvidos ao Estoque</h3>
+        <div class="number" id="stock-returned-count" style="color: var(--success-text);">-</div>
+    </div>
+    <div class="card">
+        <h3>Reentregas Agendadas</h3>
+        <div class="number" id="rescheduled-count" style="color: var(--accent-cyan);">-</div>
+    </div>
+</div>
+
+<!-- Filtros e Tabela de Ocorrências -->
+<div class="panel" style="margin-top: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <h3 style="font-size: 16px;">Ocorrências Registradas</h3>
+        <div style="display: flex; gap: 12px;">
+            <select id="filter-status" class="form-control" style="width: 200px;" onchange="loadDeliveryReturns()">
+                <option value="">Todos os Status</option>
+                <option value="PENDING_RETURN">Pendente de Retorno</option>
+                <option value="RETURNED_TO_STOCK">Devolvido ao Estoque</option>
+                <option value="RESCHEDULED">Reentrega Agendada</option>
+                <option value="CANCELLED">Cancelado</option>
+            </select>
+            <select id="filter-reason" class="form-control" style="width: 220px;" onchange="loadDeliveryReturns()">
+                <option value="">Todos os Motivos</option>
+                <option value="CLIENT_ABSENT">Cliente Ausente</option>
+                <option value="ADDRESS_NOT_FOUND">Endereço Não Localizado</option>
+                <option value="CLIENT_REFUSED">Recusado pelo Cliente</option>
+                <option value="CARGO_DAMAGED">Avaria no Transporte</option>
+                <option value="WRONG_ITEM">Item Divergente</option>
+                <option value="OTHER">Outros Motivos</option>
+            </select>
+        </div>
+    </div>
+
+    <table class="table" id="returns-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Data Tentativa</th>
+                <th>Cliente</th>
+                <th>Motivo do Insucesso</th>
+                <th>Rota / Motorista / Veículo</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody id="returns-tbody">
+            <tr>
+                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Carregando ocorrências...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Registrar Insucesso -->
+<div id="newReturnModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); align-items: center; justify-content: center;">
+    <div class="modal-content panel" style="width: 550px; max-width: 90%; position: relative;">
+        <h3 style="margin-bottom: 16px;">Registrar Insucesso de Entrega</h3>
+        <form id="newReturnForm" onsubmit="submitNewReturn(event)">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Nome do Cliente *</label>
+                <input type="text" id="customer_name" class="form-control" placeholder="Ex: João da Silva / Loja Matriz" required>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group">
+                    <label>ID da Venda (Opcional)</label>
+                    <input type="number" id="sale_id" class="form-control" placeholder="Ex: 1">
+                </div>
+                <div class="form-group">
+                    <label>Data da Tentativa *</label>
+                    <input type="date" id="attempt_date" class="form-control" required>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Motivo do Insucesso *</label>
+                <select id="reason" class="form-control" required>
+                    <option value="CLIENT_ABSENT">Cliente Ausente</option>
+                    <option value="ADDRESS_NOT_FOUND">Endereço Não Localizado</option>
+                    <option value="CLIENT_REFUSED">Recusado pelo Cliente</option>
+                    <option value="CARGO_DAMAGED">Avaria no Transporte</option>
+                    <option value="WRONG_ITEM">Item Divergente</option>
+                    <option value="OTHER">Outro Motivo</option>
+                </select>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group">
+                    <label>Motorista (Opcional)</label>
+                    <select id="driver_id" class="form-control">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Veículo (Opcional)</label>
+                    <select id="vehicle_id" class="form-control">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label>Observações / Ocorrência</label>
+                <textarea id="notes" class="form-control" rows="3" placeholder="Detalhes adicionais sobre a tentativa de entrega..."></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeNewReturnModal()">Cancelar</button>
+                <button type="submit" class="btn">Salvar Registro</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const REASON_LABELS = {
+    'CLIENT_ABSENT': 'Cliente Ausente',
+    'ADDRESS_NOT_FOUND': 'Endereço Não Localizado',
+    'CLIENT_REFUSED': 'Recusado pelo Cliente',
+    'CARGO_DAMAGED': 'Avaria no Transporte',
+    'WRONG_ITEM': 'Item Divergente',
+    'OTHER': 'Outro Motivo'
+};
+
+const STATUS_BADGES = {
+    'PENDING_RETURN': '<span class="badge badge-warning">Pendente de Retorno</span>',
+    'RETURNED_TO_STOCK': '<span class="badge badge-success">Devolvido ao Estoque</span>',
+    'RESCHEDULED': '<span class="badge badge-info" style="background: rgba(14, 165, 233, 0.15); color: #0ea5e9; padding: 4px 8px; border-radius: 4px; font-weight: 600;">Reentrega Agendada</span>',
+    'CANCELLED': '<span class="badge badge-danger">Cancelado</span>'
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('attempt_date').valueAsDate = new Date();
+    loadSummary();
+    loadDeliveryReturns();
+    loadDriversAndVehicles();
+});
+
+function loadSummary() {
+    fetch('/api/fleet/returns/summary')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('total-returns').textContent = data.total || 0;
+            document.getElementById('pending-returns').textContent = data.pending || 0;
+            document.getElementById('stock-returned-count').textContent = data.returned_to_stock || 0;
+            document.getElementById('rescheduled-count').textContent = data.rescheduled || 0;
+        });
+}
+
+function loadDeliveryReturns() {
+    const status = document.getElementById('filter-status').value;
+    const reason = document.getElementById('filter-reason').value;
+    
+    let url = '/api/fleet/returns?';
+    if (status) url += `status=${status}&`;
+    if (reason) url += `reason=${reason}&`;
+
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('returns-tbody');
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Nenhuma ocorrência de entrega encontrada.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td><strong>#${item.id}</strong></td>
+                    <td>${item.attempt_date || '-'}</td>
+                    <td>
+                        <strong>${item.customer_name}</strong>
+                        ${item.sale_id ? `<br><small style="color: var(--text-muted);">Venda #${item.sale_id}</small>` : ''}
+                    </td>
+                    <td>${REASON_LABELS[item.reason] || item.reason}</td>
+                    <td>
+                        ${item.driver_name ? `Motorista: ${item.driver_name}<br>` : ''}
+                        ${item.vehicle_plate ? `<small style="color: var(--text-muted);">Veículo: ${item.vehicle_plate}</small>` : '-'}
+                    </td>
+                    <td>${STATUS_BADGES[item.status] || item.status}</td>
+                    <td>
+                        ${item.status === 'PENDING_RETURN' ? `
+                            <button class="btn btn-sm btn-success" style="padding: 4px 8px; font-size: 12px; margin-right: 4px;" onclick="resolveReturn(${item.id}, 'RETURNED_TO_STOCK')">Devolver ao Estoque</button>
+                            <button class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="resolveReturn(${item.id}, 'RESCHEDULED')">Reagendar</button>
+                        ` : '<span style="color: var(--text-muted); font-size: 12px;">Concluído</span>'}
+                    </td>
+                </tr>
+            `).join('');
+        });
+}
+
+function loadDriversAndVehicles() {
+    fetch('/api/fleet/drivers')
+        .then(r => r.json())
+        .then(drivers => {
+            const sel = document.getElementById('driver_id');
+            drivers.forEach(d => {
+                sel.innerHTML += `<option value="${d.id}">${d.name}</option>`;
+            });
+        }).catch(() => {});
+
+    fetch('/api/fleet/vehicles')
+        .then(r => r.json())
+        .then(vehicles => {
+            const sel = document.getElementById('vehicle_id');
+            vehicles.forEach(v => {
+                sel.innerHTML += `<option value="${v.id}">${v.plate} (${v.vehicle_type})</option>`;
+            });
+        }).catch(() => {});
+}
+
+function openNewReturnModal() {
+    document.getElementById('newReturnModal').style.display = 'flex';
+}
+
+function closeNewReturnModal() {
+    document.getElementById('newReturnModal').style.display = 'none';
+}
+
+function submitNewReturn(event) {
+    event.preventDefault();
+    
+    const payload = {
+        customer_name: document.getElementById('customer_name').value,
+        sale_id: document.getElementById('sale_id').value ? parseInt(document.getElementById('sale_id').value) : null,
+        attempt_date: document.getElementById('attempt_date').value,
+        reason: document.getElementById('reason').value,
+        driver_id: document.getElementById('driver_id').value ? parseInt(document.getElementById('driver_id').value) : null,
+        vehicle_id: document.getElementById('vehicle_id').value ? parseInt(document.getElementById('vehicle_id').value) : null,
+        notes: document.getElementById('notes').value
+    };
+
+    fetch('/api/fleet/returns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => {
+        if (!r.ok) return r.json().then(err => { throw new Error(err.error); });
+        return r.json();
+    })
+    .then(() => {
+        closeNewReturnModal();
+        document.getElementById('newReturnForm').reset();
+        document.getElementById('attempt_date').valueAsDate = new Date();
+        loadSummary();
+        loadDeliveryReturns();
+    })
+    .catch(err => alert('Erro ao registrar ocorrência: ' + err.message));
+}
+
+function resolveReturn(id, status) {
+    const actionText = status === 'RETURNED_TO_STOCK' 
+        ? 'Deseja confirmar o retorno deste produto ao estoque? Se houver venda associada, os itens serão incrementados automaticamente.'
+        : 'Deseja marcar esta entrega como reagendada?';
+    
+    if (!confirm(actionText)) return;
+
+    fetch(`/api/fleet/returns/${id}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            status: status,
+            action_taken: status === 'RETURNED_TO_STOCK' ? 'Devolvido ao estoque via módulo de frota.' : 'Reentrega agendada.'
+        })
+    })
+    .then(r => r.json())
+    .then(() => {
+        loadSummary();
+        loadDeliveryReturns();
+    });
+}
+</script>
+{% endblock %}

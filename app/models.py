@@ -202,3 +202,82 @@ class Route(db.Model):
 
     def __repr__(self):
         return f"<Route {self.route_name}>"
+
+
+class DeliveryReturn(db.Model):
+    __tablename__ = "delivery_returns"
+
+    id = db.Column(db.Integer, primary_key=True)
+    sale_id = db.Column(
+        db.Integer,
+        db.ForeignKey("sales.id"),
+        nullable=True,
+    )
+    route_id = db.Column(
+        db.Integer,
+        db.ForeignKey("routes.id"),
+        nullable=True,
+    )
+    driver_id = db.Column(
+        db.Integer,
+        db.ForeignKey("drivers.id"),
+        nullable=True,
+    )
+    vehicle_id = db.Column(
+        db.Integer,
+        db.ForeignKey("fleet_vehicles.id"),
+        nullable=True,
+    )
+    customer_name = db.Column(db.String(120), nullable=False)
+    attempt_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    reason = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(30), nullable=False, default="PENDING_RETURN")
+    action_taken = db.Column(db.Text, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+    sale = db.relationship("Sale", backref="delivery_returns", lazy=True)
+    route = db.relationship("Route", backref="delivery_returns", lazy=True)
+    driver = db.relationship("Driver", backref="delivery_returns", lazy=True)
+    vehicle = db.relationship("FleetVehicle", backref="delivery_returns", lazy=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "sale_id": self.sale_id,
+            "route_id": self.route_id,
+            "route_name": self.route.route_name if self.route else None,
+            "driver_id": self.driver_id,
+            "driver_name": self.driver.name if self.driver else None,
+            "vehicle_id": self.vehicle_id,
+            "vehicle_plate": self.vehicle.plate if self.vehicle else None,
+            "customer_name": self.customer_name,
+            "attempt_date": (
+                self.attempt_date.isoformat()
+                if self.attempt_date
+                else None
+            ),
+            "reason": self.reason,
+            "status": self.status,
+            "action_taken": self.action_taken,
+            "notes": self.notes,
+            "created_at": (
+                self.created_at.isoformat()
+                if self.created_at
+                else None
+            ),
+            "updated_at": (
+                self.updated_at.isoformat()
+                if self.updated_at
+                else None
+            ),
+        }
+
+    def __repr__(self):
+        return f"<DeliveryReturn {self.id} - {self.reason}>"
