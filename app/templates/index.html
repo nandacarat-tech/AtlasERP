@@ -204,7 +204,7 @@
                         <tr>
                             <td><strong>#{{ s.id }}</strong></td>
                             <td>{{ s.customer_name }}</td>
-                            <td>{{ s.items|length }} item(ns)</td>
+                            <td>{{ s['items']|length }} item(ns)</td>
                             <td><strong>R$ {{ "%.2f"|format(s.total_amount|float)|replace('.', ',') }}</strong></td>
                             <td>
                                 {% if s.status == 'CONFIRMED' %}
