@@ -1,11 +1,11 @@
-﻿from datetime import date
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, jsonify, request, render_template
 
 from app import db
 from app.customer_models import Customer
-from app.models import FleetMaintenance,FleetVehicle, Product
+from app.models import Driver, FleetMaintenance, FleetVehicle, Product, Route
 from app.sale_models import Sale, SaleItem
 from app.sale_status import (
     CANCELLED,
@@ -1473,3 +1473,370 @@ def update_fleet_maintenance(maintenance_id):
     db.session.commit()
 
     return jsonify(maintenance_to_dict(maintenance))
+
+
+# --- Rotas da API para Frota (Motoristas) ---
+
+DRIVER_STATUSES = {
+    "ACTIVE",
+    "INACTIVE",
+    "SUSPENDED",
+}
+
+
+def driver_to_dict(driver):
+    return driver.to_dict()
+
+
+def route_to_dict(route):
+    return route.to_dict()
+
+
+@main.get("/fleet/drivers")
+def list_fleet_drivers():
+    drivers = Driver.query.order_by(Driver.id.desc()).all()
+    return jsonify([driver.to_dict() for driver in drivers])
+
+
+@main.post("/fleet/drivers")
+def create_fleet_driver():
+    data = request.get_json(silent=True) or {}
+
+    required_fields = (
+        "name",
+        "cpf",
+        "license_number",
+        "license_category",
+        "license_expiry",
+    )
+
+    missing_fields = [
+        field for field in required_fields
+        if data.get(field) in (None, "")
+    ]
+
+    if missing_fields:
+        return jsonify({
+            "error": "Campos obrigatórios ausentes.",
+            "fields": missing_fields,
+        }), 400
+
+    name = str(data["name"]).strip()
+    cpf = str(data["cpf"]).strip()
+    license_number = str(data["license_number"]).strip()
+    license_category = str(data["license_category"]).strip().upper()
+    status = str(data.get("status") or "ACTIVE").strip().upper()
+
+    if not name:
+        return jsonify({"error": "O nome é obrigatório."}), 400
+
+    if status not in DRIVER_STATUSES:
+        return jsonify({"error": "Status de motorista inválido."}), 400
+
+    if Driver.query.filter_by(cpf=cpf).first():
+        return jsonify({"error": "Já existe um motorista com esse CPF."}), 409
+
+    if Driver.query.filter_by(license_number=license_number).first():
+        return jsonify({"error": "Já existe um motorista com esse número de CNH."}), 409
+
+    try:
+        license_expiry = parse_optional_date(data["license_expiry"], "license_expiry")
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    vehicle_id = data.get("vehicle_id")
+    if vehicle_id:
+        try:
+            vehicle_id = int(vehicle_id)
+            vehicle = db.session.get(FleetVehicle, vehicle_id)
+            if not vehicle:
+                return jsonify({"error": "Veículo não encontrado."}), 404
+        except ValueError:
+            return jsonify({"error": "ID de veículo inválido."}), 400
+    else:
+        vehicle_id = None
+
+    driver = Driver(
+        name=name,
+        cpf=cpf,
+        phone=str(data.get("phone") or "").strip() or None,
+        license_number=license_number,
+        license_category=license_category,
+        license_expiry=license_expiry,
+        status=status,
+        vehicle_id=vehicle_id,
+        notes=str(data.get("notes") or "").strip() or None,
+    )
+
+    db.session.add(driver)
+    db.session.commit()
+
+    return jsonify(driver.to_dict()), 201
+
+
+@main.get("/fleet/drivers/<int:driver_id>")
+def get_fleet_driver(driver_id):
+    driver = db.session.get(Driver, driver_id)
+    if driver is None:
+        return jsonify({"error": "Motorista não encontrado."}), 404
+
+    return jsonify(driver.to_dict())
+
+
+@main.put("/fleet/drivers/<int:driver_id>")
+def update_fleet_driver(driver_id):
+    driver = db.session.get(Driver, driver_id)
+    if driver is None:
+        return jsonify({"error": "Motorista não encontrado."}), 404
+
+    data = request.get_json(silent=True) or {}
+
+    if "name" in data:
+        name = str(data["name"]).strip()
+        if not name:
+            return jsonify({"error": "O nome não pode ficar vazio."}), 400
+        driver.name = name
+
+    if "cpf" in data:
+        cpf = str(data["cpf"]).strip()
+        existing = Driver.query.filter(
+            Driver.cpf == cpf,
+            Driver.id != driver.id,
+        ).first()
+        if existing:
+            return jsonify({"error": "Já existe um motorista com esse CPF."}), 409
+        driver.cpf = cpf
+
+    if "phone" in data:
+        driver.phone = str(data["phone"] or "").strip() or None
+
+    if "license_number" in data:
+        license_number = str(data["license_number"]).strip()
+        existing = Driver.query.filter(
+            Driver.license_number == license_number,
+            Driver.id != driver.id,
+        ).first()
+        if existing:
+            return jsonify({"error": "Já existe um motorista com esse número de CNH."}), 409
+        driver.license_number = license_number
+
+    if "license_category" in data:
+        driver.license_category = str(data["license_category"]).strip().upper()
+
+    if "license_expiry" in data:
+        try:
+            driver.license_expiry = parse_optional_date(data["license_expiry"], "license_expiry")
+        except ValueError as error:
+            return jsonify({"error": str(error)}), 400
+
+    if "status" in data:
+        status = str(data["status"]).strip().upper()
+        if status not in DRIVER_STATUSES:
+            return jsonify({"error": "Status de motorista inválido."}), 400
+        driver.status = status
+
+    if "vehicle_id" in data:
+        vehicle_id = data["vehicle_id"]
+        if vehicle_id in ("", None):
+            driver.vehicle_id = None
+        else:
+            try:
+                vehicle_id = int(vehicle_id)
+                vehicle = db.session.get(FleetVehicle, vehicle_id)
+                if vehicle is None:
+                    return jsonify({"error": "Veículo não encontrado."}), 404
+                driver.vehicle_id = vehicle.id
+            except ValueError:
+                return jsonify({"error": "ID de veículo inválido."}), 400
+
+    if "notes" in data:
+        driver.notes = str(data["notes"] or "").strip() or None
+
+    db.session.commit()
+    return jsonify(driver.to_dict())
+
+
+@main.delete("/fleet/drivers/<int:driver_id>")
+def deactivate_fleet_driver(driver_id):
+    driver = db.session.get(Driver, driver_id)
+    if driver is None:
+        return jsonify({"error": "Motorista não encontrado."}), 404
+
+    driver.status = "INACTIVE"
+    db.session.commit()
+
+    return jsonify(driver.to_dict())
+
+
+# --- Rotas da API para Frota (Rotas) ---
+
+ROUTE_STATUSES = {
+    "PENDING",
+    "IN_PROGRESS",
+    "COMPLETED",
+    "CANCELLED",
+}
+
+
+@main.get("/fleet/routes")
+def list_fleet_routes():
+    routes = Route.query.order_by(Route.start_date.desc(), Route.id.desc()).all()
+    return jsonify([route.to_dict() for route in routes])
+
+
+@main.post("/fleet/routes")
+def create_fleet_route():
+    data = request.get_json(silent=True) or {}
+
+    required_fields = (
+        "route_name",
+        "start_date",
+    )
+
+    missing_fields = [
+        field for field in required_fields
+        if data.get(field) in (None, "")
+    ]
+
+    if missing_fields:
+        return jsonify({
+            "error": "Campos obrigatórios ausentes",
+            "fields": missing_fields,
+        }), 400
+
+    route_name = str(data["route_name"]).strip()
+    status = str(data.get("status") or "PENDING").strip().upper()
+
+    if status not in ROUTE_STATUSES:
+        return jsonify({"error": "Status de rota inválido."}), 400
+
+    try:
+        start_date = parse_optional_date(data["start_date"], "start_date")
+        end_date = parse_optional_date(data.get("end_date"), "end_date")
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+    vehicle_id = data.get("vehicle_id")
+    if vehicle_id in ("", None):
+        vehicle_id = None
+    else:
+        try:
+            vehicle_id = int(vehicle_id)
+            vehicle = db.session.get(FleetVehicle, vehicle_id)
+            if vehicle is None:
+                return jsonify({"error": "Veículo não encontrado."}), 404
+        except ValueError:
+            return jsonify({"error": "ID de veículo inválido."}), 400
+
+    driver_id = data.get("driver_id")
+    if driver_id in ("", None):
+        driver_id = None
+    else:
+        try:
+            driver_id = int(driver_id)
+            driver = db.session.get(Driver, driver_id)
+            if driver is None:
+                return jsonify({"error": "Motorista não encontrado."}), 404
+        except ValueError:
+            return jsonify({"error": "ID de motorista inválido."}), 400
+
+    route = Route(
+        route_name=route_name,
+        vehicle_id=vehicle_id,
+        driver_id=driver_id,
+        start_date=start_date,
+        end_date=end_date,
+        status=status,
+        description=str(data.get("description") or "").strip() or None,
+    )
+
+    db.session.add(route)
+    db.session.commit()
+
+    return jsonify(route.to_dict()), 201
+
+
+@main.get("/fleet/routes/<int:route_id>")
+def get_fleet_route(route_id):
+    route = db.session.get(Route, route_id)
+    if route is None:
+        return jsonify({"error": "Rota não encontrada."}), 404
+
+    return jsonify(route.to_dict())
+
+
+@main.put("/fleet/routes/<int:route_id>")
+def update_fleet_route(route_id):
+    route = db.session.get(Route, route_id)
+    if route is None:
+        return jsonify({"error": "Rota não encontrada."}), 404
+
+    data = request.get_json(silent=True) or {}
+
+    if "route_name" in data:
+        route.route_name = str(data["route_name"]).strip()
+
+    if "start_date" in data:
+        try:
+            route.start_date = parse_optional_date(data["start_date"], "start_date")
+        except ValueError as error:
+            return jsonify({"error": str(error)}), 400
+
+    if "end_date" in data:
+        try:
+            route.end_date = parse_optional_date(data["end_date"], "end_date")
+        except ValueError as error:
+            return jsonify({"error": str(error)}), 400
+
+    if "status" in data:
+        status = str(data["status"]).strip().upper()
+        if status not in ROUTE_STATUSES:
+            return jsonify({"error": "Status de rota inválido."}), 400
+        route.status = status
+
+    if "description" in data:
+        route.description = str(data["description"] or "").strip() or None
+
+    if "vehicle_id" in data:
+        vehicle_id = data["vehicle_id"]
+        if vehicle_id in ("", None):
+            route.vehicle_id = None
+        else:
+            try:
+                vehicle_id = int(vehicle_id)
+                vehicle = db.session.get(FleetVehicle, vehicle_id)
+                if vehicle is None:
+                    return jsonify({"error": "Veículo não encontrado."}), 404
+                route.vehicle_id = vehicle.id
+            except ValueError:
+                return jsonify({"error": "ID de veículo inválido."}), 400
+
+    if "driver_id" in data:
+        driver_id = data["driver_id"]
+        if driver_id in ("", None):
+            route.driver_id = None
+        else:
+            try:
+                driver_id = int(driver_id)
+                driver = db.session.get(Driver, driver_id)
+                if driver is None:
+                    return jsonify({"error": "Motorista não encontrado."}), 404
+                route.driver_id = driver.id
+            except ValueError:
+                return jsonify({"error": "ID de motorista inválido."}), 400
+
+    db.session.commit()
+    return jsonify(route.to_dict())
+
+
+@main.delete("/fleet/routes/<int:route_id>")
+def delete_fleet_route(route_id):
+    route = db.session.get(Route, route_id)
+    if route is None:
+        return jsonify({"error": "Rota não encontrada."}), 404
+
+    db.session.delete(route)
+    db.session.commit()
+
+    return jsonify({"message": "Rota excluída com sucesso."}), 200
+
