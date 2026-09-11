@@ -5,15 +5,36 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h2>Contas & Lançamentos de Custos</h2>
-        <p style="color: var(--text-muted); font-size: 14px;">Gerencie receitas, despesas, custos fixos e variáveis da empresa.</p>
+        <h2>Contas & Lançamentos Financeiros</h2>
+        <p style="color: var(--text-muted); font-size: 14px;">Gerencie receitas, despesas, contas a pagar e contas a receber da empresa.</p>
     </div>
 </div>
 
 <div id="message" class="message"></div>
 
+<!-- KPI Cards do Extrato Financeiro -->
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <div class="card" style="border-left: 4px solid var(--danger-text);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Contas a Pagar (Pendentes)</h3>
+        <div id="kpi-pending-expense" class="number" style="color: var(--danger-text); font-size: 24px; font-weight: 700; margin: 6px 0;">R$ 0,00</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Despesas operacionais a pagar</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--success-text);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Contas a Receber (Pendentes)</h3>
+        <div id="kpi-pending-revenue" class="number" style="color: var(--success-text); font-size: 24px; font-weight: 700; margin: 6px 0;">R$ 0,00</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Recebimentos a entrar</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--accent-indigo);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Total de Despesas Pagas</h3>
+        <div id="kpi-paid-expense" class="number" style="color: var(--accent-indigo); font-size: 24px; font-weight: 700; margin: 6px 0;">R$ 0,00</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Contas quitadas</p>
+    </div>
+</div>
+
 <!-- Formulário de Lançamento -->
-<div class="panel">
+<div class="panel" style="margin-bottom: 24px;">
     <h3 style="margin-bottom: 16px; font-size: 16px;">Novo Lançamento Financeiro</h3>
     <form id="transaction-form">
         <div class="form-grid">
@@ -23,7 +44,7 @@
             </label>
             <label>
                 Valor (R$):
-                <input type="number" step="0.01" id="amount" required placeholder="0.00">
+                <input type="number" step="0.01" id="amount" required placeholder="0,00">
             </label>
             <label>
                 Tipo:
@@ -50,8 +71,8 @@
                 </select>
             </label>
         </div>
-        <div style="margin-top: 12px;">
-            <button type="submit" class="btn">Salvar Lançamento</button>
+        <div style="margin-top: 16px;">
+            <button type="submit" class="btn">+ Salvar Lançamento</button>
         </div>
     </form>
 </div>
@@ -60,7 +81,7 @@
 <div class="panel">
     <h3 style="margin-bottom: 16px; font-size: 16px;">Histórico de Lançamentos</h3>
     <div class="table-wrapper">
-        <table>
+        <table class="table">
             <thead>
                 <tr>
                     <th>Descrição</th>
@@ -69,12 +90,12 @@
                     <th>Valor</th>
                     <th>Vencimento</th>
                     <th>Status</th>
-                    <th>Ações</th>
+                    <th style="text-align: right;">Ações</th>
                 </tr>
             </thead>
             <tbody id="transactions-table-body">
                 <tr>
-                    <td colspan="7">Carregando lançamentos...</td>
+                    <td colspan="7" style="text-align: center; padding: 24px;">Carregando lançamentos...</td>
                 </tr>
             </tbody>
         </table>
@@ -100,26 +121,50 @@ function loadCategories() {
         });
 }
 
+function updateKPIs(data) {
+    let pendingExp = 0;
+    let pendingRev = 0;
+    let paidExp = 0;
+
+    data.forEach(item => {
+        const val = Number(item.amount || 0);
+        if (item.transaction_type === 'EXPENSE') {
+            if (item.status === 'PENDING') pendingExp += val;
+            else if (item.status === 'PAID') paidExp += val;
+        } else if (item.transaction_type === 'REVENUE') {
+            if (item.status === 'PENDING') pendingRev += val;
+        }
+    });
+
+    document.getElementById('kpi-pending-expense').textContent = formatMoney(pendingExp);
+    document.getElementById('kpi-pending-revenue').textContent = formatMoney(pendingRev);
+    document.getElementById('kpi-paid-expense').textContent = formatMoney(paidExp);
+}
+
 function loadTransactions() {
     fetch('/api/financial/transactions')
         .then(r => r.json())
         .then(data => {
+            updateKPIs(data);
+
             const tbody = document.getElementById('transactions-table-body');
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="empty">Nenhum lançamento cadastrado.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Nenhum lançamento cadastrado.</td></tr>';
                 return;
             }
             tbody.innerHTML = data.map(item => `
                 <tr>
                     <td><strong>${item.description}</strong></td>
-                    <td><span class="status ${item.transaction_type.toLowerCase()}">${item.transaction_type === 'EXPENSE' ? 'Despesa' : 'Receita'}</span></td>
-                    <td>${item.category_name}</td>
+                    <td><span class="badge ${item.transaction_type === 'EXPENSE' ? 'badge-danger' : 'badge-success'}">${item.transaction_type === 'EXPENSE' ? 'Despesa' : 'Receita'}</span></td>
+                    <td>${item.category_name || '-'}</td>
                     <td style="font-weight: 700; color: ${item.transaction_type === 'EXPENSE' ? 'var(--danger-text)' : 'var(--success-text)'};">${formatMoney(item.amount)}</td>
                     <td>${item.due_date || '-'}</td>
-                    <td><span class="status ${item.status.toLowerCase()}">${item.status === 'PAID' ? 'Pago' : 'Pendente'}</span></td>
-                    <td>
-                        ${item.status === 'PENDING' ? `<button onclick="markAsPaid(${item.id})" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Marcar Pago</button>` : ''}
-                        <button onclick="deleteTransaction(${item.id})" class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;">Excluir</button>
+                    <td><span class="badge ${item.status === 'PAID' ? 'badge-success' : 'badge-warning'}">${item.status === 'PAID' ? 'Pago' : 'Pendente'}</span></td>
+                    <td style="text-align: right;">
+                        <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                            ${item.status === 'PENDING' ? `<button onclick="markAsPaid(${item.id})" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">✓ Marcar Pago</button>` : ''}
+                            <button onclick="deleteTransaction(${item.id})" class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;">Excluir</button>
+                        </div>
                     </td>
                 </tr>
             `).join('');

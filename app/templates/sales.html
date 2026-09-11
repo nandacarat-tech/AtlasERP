@@ -5,89 +5,135 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h2>Vendas</h2>
-        <p>Registre vendas e acompanhe seus pedidos.</p>
+        <h2>Gestão de Vendas & Pedidos</h2>
+        <p>Registre novos pedidos, acompanhe o faturamento e gerencie vendas em aberto.</p>
     </div>
+
+    <button id="reload-button" class="btn btn-secondary" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Atualizar dados
+    </button>
 </div>
 
 <div id="message" class="message"></div>
 
-<div class="panel">
-    <h2>Nova venda</h2>
+<!-- KPI Cards de Vendas -->
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <div class="card" style="border-left: 4px solid var(--accent-indigo);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Total de Pedidos</h3>
+        <div id="kpi-total-sales" class="number" style="font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Vendas registradas</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--success-text);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Vendas Confirmadas</h3>
+        <div id="kpi-confirmed-sales" class="number" style="color: var(--success-text); font-size: 24px; font-weight: 700; margin: 6px 0;">R$ 0,00</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Faturamento efetivado</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--warning-text);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Vendas em Aberto</h3>
+        <div id="kpi-open-sales" class="number" style="color: var(--warning-text); font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Aguardando confirmação</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--danger-text);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Vendas Canceladas</h3>
+        <div id="kpi-cancelled-sales" class="number" style="color: var(--danger-text); font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Pedidos cancelados</p>
+    </div>
+</div>
+
+<!-- Form de Registro de Nova Venda -->
+<div class="panel" style="margin-bottom: 24px;">
+    <h2 style="margin-top: 0; margin-bottom: 16px;">Registrar Nova Venda</h2>
 
     <form id="sale-form">
-        <label>
-            Cliente
-            <select id="customer-id" required>
-                <option value="">Selecione um cliente</option>
-            </select>
-        </label>
-
-        <div class="sale-item-form">
-            <label>
-                Produto
-                <select id="product-id">
-                    <option value="">Selecione um produto</option>
+        <div style="margin-bottom: 16px;">
+            <label style="font-weight: 600; margin-bottom: 6px; display: block;">
+                Cliente Comprador
+                <select id="customer-id" required style="width: 100%; max-width: 500px; padding: 10px; margin-top: 4px;">
+                    <option value="">Selecione um cliente</option>
                 </select>
             </label>
-
-            <label>
-                Quantidade
-                <input id="quantity" type="number" min="1" value="1">
-            </label>
-
-            <button id="add-item" type="button">Adicionar item</button>
         </div>
 
-        <div class="table-wrapper">
-            <table>
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+            <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 14px;">Adicionar Produtos à Venda</h4>
+
+            <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                <label style="flex: 2; min-width: 200px;">
+                    Produto Disponível
+                    <select id="product-id" style="width: 100%; padding: 8px; margin-top: 4px;">
+                        <option value="">Selecione um produto</option>
+                    </select>
+                </label>
+
+                <label style="flex: 1; min-width: 100px;">
+                    Quantidade
+                    <input id="quantity" type="number" min="1" value="1" style="width: 100%; padding: 8px; margin-top: 4px;">
+                </label>
+
+                <button id="add-item" class="btn btn-secondary" type="button" style="padding: 8px 16px;">
+                    + Adicionar Item
+                </button>
+            </div>
+        </div>
+
+        <div class="table-wrapper" style="margin-bottom: 16px;">
+            <table class="table">
                 <thead>
                     <tr>
                         <th>Produto</th>
                         <th>Quantidade</th>
-                        <th>Preço unitário</th>
+                        <th>Preço Unitário</th>
                         <th>Subtotal</th>
-                        <th>Ação</th>
+                        <th style="text-align: right;">Ação</th>
                     </tr>
                 </thead>
                 <tbody id="items-table"></tbody>
             </table>
         </div>
 
-        <div class="sale-total">
-            Total estimado: R$ <strong id="sale-total">0,00</strong>
-        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); padding: 16px; border-radius: 8px; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+            <div style="font-size: 16px;">
+                Total Estimado da Venda: <strong id="sale-total" style="color: var(--success-text); font-size: 22px; font-weight: 800;">R$ 0,00</strong>
+            </div>
 
-        <button type="submit">Registrar venda</button>
+            <button type="submit" class="btn" style="padding: 10px 24px; font-size: 15px;">
+                ✓ Confirmar & Salvar Venda
+            </button>
+        </div>
     </form>
 </div>
 
+<!-- Tabela de Vendas Registradas -->
 <div class="panel">
-    <div class="page-header">
-        <h2>Vendas registradas</h2>
-        <button id="reload-button" class="secondary" type="button">
-            ↻ Atualizar dados
-        </button>
+    <div class="page-header" style="margin-bottom: 16px;">
+        <div>
+            <h2 style="margin: 0;">Histórico de Vendas</h2>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Acompanhe todos os pedidos de venda do seu negócio.</p>
+        </div>
     </div>
 
-    <div class="filters">
-        <select id="status-filter">
-            <option value="">Todos os status</option>
-            <option value="OPEN">Abertas</option>
-            <option value="CONFIRMED">Confirmadas</option>
-            <option value="CANCELLED">Canceladas</option>
+    <div class="filters" style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+        <select id="status-filter" style="min-width: 200px;">
+            <option value="">Todos os Status de Venda</option>
+            <option value="OPEN">Vendas em Aberto</option>
+            <option value="CONFIRMED">Vendas Confirmadas</option>
+            <option value="CANCELLED">Vendas Canceladas</option>
         </select>
     </div>
 
     <div class="table-wrapper">
-        <table>
+        <table class="table">
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>Nº Venda</th>
                     <th>Cliente</th>
                     <th>Status</th>
-                    <th>Total</th>
-                    <th>Ações</th>
+                    <th>Valor Total</th>
+                    <th style="text-align: right;">Ações de Controle</th>
                 </tr>
             </thead>
             <tbody id="sales-table"></tbody>
@@ -105,15 +151,22 @@
     const saleTotal = document.getElementById("sale-total");
     const salesTable = document.getElementById("sales-table");
     const statusFilter = document.getElementById("status-filter");
+    const reloadButton = document.getElementById("reload-button");
+
+    const kpiTotalSales = document.getElementById("kpi-total-sales");
+    const kpiConfirmedSales = document.getElementById("kpi-confirmed-sales");
+    const kpiOpenSales = document.getElementById("kpi-open-sales");
+    const kpiCancelledSales = document.getElementById("kpi-cancelled-sales");
 
     let products = [];
     let customers = [];
     let saleItems = [];
+    let allSales = [];
 
     function showMessage(text, type = "success") {
         message.textContent = text;
         message.className = `message ${type}`;
-        setTimeout(() => message.className = "message", 3000);
+        setTimeout(() => message.className = "message", 3500);
     }
 
     function money(value) {
@@ -138,7 +191,7 @@
                 .filter(customer => customer.is_active)
                 .map(customer => `
                     <option value="${customer.id}">
-                        ${customer.name} - ${customer.document}
+                        ${customer.name} (${customer.document})
                     </option>
                 `).join("")}
         `;
@@ -149,7 +202,7 @@
                 .filter(product => product.is_active && product.stock_quantity > 0)
                 .map(product => `
                     <option value="${product.id}">
-                        ${product.name} - estoque: ${product.stock_quantity}
+                        ${product.name} - R$ ${money(product.price)} (Disponível: ${product.stock_quantity})
                     </option>
                 `).join("")}
         `;
@@ -159,14 +212,15 @@
         itemsTable.innerHTML = saleItems.length
             ? saleItems.map((item, index) => `
                 <tr>
-                    <td>${item.product.name}</td>
-                    <td>${item.quantity}</td>
+                    <td><strong>${item.product.name}</strong></td>
+                    <td>${item.quantity} unid.</td>
                     <td>R$ ${money(item.product.price)}</td>
-                    <td>R$ ${money(item.product.price * item.quantity)}</td>
-                    <td>
+                    <td><strong>R$ ${money(item.product.price * item.quantity)}</strong></td>
+                    <td style="text-align: right;">
                         <button
                             type="button"
-                            class="secondary"
+                            class="btn btn-secondary"
+                            style="padding: 4px 8px; font-size: 12px;"
                             onclick="removeItem(${index})"
                         >
                             Remover
@@ -176,8 +230,8 @@
             `).join("")
             : `
                 <tr>
-                    <td colspan="5" class="empty">
-                        Nenhum item adicionado.
+                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">
+                        Nenhum produto adicionado ao carrinho ainda.
                     </td>
                 </tr>
             `;
@@ -187,7 +241,7 @@
             0
         );
 
-        saleTotal.textContent = money(total);
+        saleTotal.textContent = `R$ ${money(total)}`;
     }
 
     function addItem() {
@@ -230,126 +284,175 @@
         }
 
         if (!saleItems.length) {
-            showMessage("Adicione pelo menos um produto.", "error");
+            showMessage("Adicione pelo menos um produto ao pedido.", "error");
             return;
         }
 
-        const response = await fetch("/sales", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                customer_id: Number(customerSelect.value),
-                items: saleItems.map(item => ({
-                    product_id: item.product.id,
-                    quantity: item.quantity
-                }))
-            })
+        try {
+            const response = await fetch("/sales", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    customer_id: Number(customerSelect.value),
+                    items: saleItems.map(item => ({
+                        product_id: item.product.id,
+                        quantity: item.quantity
+                    }))
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Erro ao registrar venda.");
+            }
+
+            showMessage("Venda registrada com sucesso!");
+            saleForm.reset();
+            saleItems = [];
+            renderItems();
+            await loadOptions();
+            await loadSales();
+        } catch (error) {
+            showMessage(error.message, "error");
+        }
+    }
+
+    function updateKPIs(sales) {
+        const totalCount = sales.length;
+        let confirmedTotal = 0;
+        let openCount = 0;
+        let cancelledCount = 0;
+
+        sales.forEach(s => {
+            if (s.status === "CONFIRMED") {
+                confirmedTotal += Number(s.total_amount || 0);
+            } else if (s.status === "OPEN") {
+                openCount++;
+            } else if (s.status === "CANCELLED") {
+                cancelledCount++;
+            }
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            showMessage(data.error || "Erro ao registrar venda.", "error");
-            return;
-        }
-
-        showMessage("Venda registrada com sucesso.");
-        saleForm.reset();
-        saleItems = [];
-        renderItems();
-        await loadOptions();
-        await loadSales();
+        kpiTotalSales.textContent = totalCount;
+        kpiConfirmedSales.textContent = `R$ ${money(confirmedTotal)}`;
+        kpiOpenSales.textContent = openCount;
+        kpiCancelledSales.textContent = cancelledCount;
     }
 
     async function loadSales() {
         const status = statusFilter.value;
-        const url = status
-            ? `/sales?status=${encodeURIComponent(status)}`
-            : "/sales";
+        const url = status ? `/sales?status=${encodeURIComponent(status)}` : "/sales";
 
-        const response = await fetch(url, { cache: "no-store" });
-        const sales = await response.json();
+        try {
+            const response = await fetch(url, { cache: "no-store" });
+            const sales = await response.json();
+            allSales = sales;
 
-        salesTable.innerHTML = sales.length
-            ? sales.map(sale => `
-                <tr>
-                    <td>#${sale.id}</td>
-                    <td>${sale.customer_id}</td>
-                    <td>${sale.status}</td>
-                    <td>R$ ${money(sale.total_amount)}</td>
-                    <td>
-                        ${sale.status === "OPEN" ? `
-                            <button
-                                type="button"
-                                onclick="confirmSale(${sale.id})"
-                            >
-                                Confirmar
-                            </button>
-                            <button
-                                type="button"
-                                class="secondary"
-                                onclick="cancelSale(${sale.id})"
-                            >
-                                Cancelar
-                            </button>
-                        ` : "-"}
-                    </td>
-                </tr>
-            `).join("")
-            : `
-                <tr>
-                    <td colspan="5" class="empty">
-                        Nenhuma venda encontrada.
-                    </td>
-                </tr>
-            `;
+            updateKPIs(allSales);
+
+            salesTable.innerHTML = sales.length
+                ? sales.map(sale => {
+                    const cust = customers.find(c => c.id === sale.customer_id);
+                    const customerName = cust ? cust.name : (sale.customer_name || `Cliente #${sale.customer_id}`);
+
+                    let badgeHtml = '';
+                    if (sale.status === 'CONFIRMED') {
+                        badgeHtml = '<span class="badge badge-success">Confirmada</span>';
+                    } else if (sale.status === 'OPEN') {
+                        badgeHtml = '<span class="badge badge-warning">Em Aberto</span>';
+                    } else if (sale.status === 'CANCELLED') {
+                        badgeHtml = '<span class="badge badge-danger">Cancelada</span>';
+                    } else {
+                        badgeHtml = `<span class="badge badge-info">${sale.status}</span>`;
+                    }
+
+                    return `
+                        <tr>
+                            <td><strong>#${sale.id}</strong></td>
+                            <td>${customerName}</td>
+                            <td>${badgeHtml}</td>
+                            <td><strong>R$ ${money(sale.total_amount)}</strong></td>
+                            <td style="text-align: right;">
+                                ${sale.status === "OPEN" ? `
+                                    <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                                        <button
+                                            type="button"
+                                            class="btn"
+                                            style="padding: 4px 10px; font-size: 12px;"
+                                            onclick="confirmSale(${sale.id})"
+                                        >
+                                            ✓ Confirmar Venda
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="btn btn-secondary"
+                                            style="padding: 4px 10px; font-size: 12px; background: rgba(239, 68, 68, 0.15); color: var(--danger-text);"
+                                            onclick="cancelSale(${sale.id})"
+                                        >
+                                            ✕ Cancelar
+                                        </button>
+                                    </div>
+                                ` : `<span style="color: var(--text-muted); font-size: 12px;">Concluído</span>`}
+                            </td>
+                        </tr>
+                    `;
+                }).join("")
+                : `
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                            Nenhuma venda encontrada com os filtros selecionados.
+                        </td>
+                    </tr>
+                `;
+        } catch (error) {
+            showMessage("Erro ao carregar vendas.", "error");
+        }
     }
 
     async function confirmSale(id) {
-        const response = await fetch(`/sales/${id}/confirm`, {
-            method: "POST"
-        });
+        try {
+            const response = await fetch(`/sales/${id}/confirm`, { method: "POST" });
+            const data = await response.json();
 
-        const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "Erro ao confirmar venda.");
+            }
 
-        if (!response.ok) {
-            showMessage(data.error || "Erro ao confirmar venda.", "error");
-            return;
+            showMessage("Venda confirmada com sucesso!");
+            await loadSales();
+            await loadOptions();
+        } catch (error) {
+            showMessage(error.message, "error");
         }
-
-        showMessage("Venda confirmada.");
-        await loadSales();
-        await loadOptions();
     }
 
     async function cancelSale(id) {
-        const response = await fetch(`/sales/${id}/cancel`, {
-            method: "POST"
-        });
+        try {
+            const response = await fetch(`/sales/${id}/cancel`, { method: "POST" });
+            const data = await response.json();
 
-        const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "Erro ao cancelar venda.");
+            }
 
-        if (!response.ok) {
-            showMessage(data.error || "Erro ao cancelar venda.", "error");
-            return;
+            showMessage("Venda cancelada.");
+            await loadSales();
+            await loadOptions();
+        } catch (error) {
+            showMessage(error.message, "error");
         }
-
-        showMessage("Venda cancelada.");
-        await loadSales();
     }
 
     document.getElementById("add-item").addEventListener("click", addItem);
     saleForm.addEventListener("submit", createSale);
     statusFilter.addEventListener("change", loadSales);
-    document.getElementById("reload-button").addEventListener("click", async () => {
+    reloadButton.addEventListener("click", async () => {
         await loadOptions();
         await loadSales();
     });
 
     renderItems();
-    loadOptions();
-    loadSales();
+    loadOptions().then(loadSales);
 </script>
 {% endblock %}

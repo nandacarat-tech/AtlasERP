@@ -5,81 +5,117 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h2>Fornecedores</h2>
-        <p>Cadastre e gerencie seus fornecedores.</p>
+        <h2>Gestão de Fornecedores</h2>
+        <p>Cadastre, edite contatos e gerencie os parceiros de fornecimento da sua empresa.</p>
     </div>
+
+    <button id="reload-button" class="btn btn-secondary" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Atualizar dados
+    </button>
 </div>
 
 <div id="message" class="message"></div>
 
-<div class="panel">
-    <h2>Novo fornecedor</h2>
+<!-- KPI Cards de Fornecedores -->
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <div class="card" style="border-left: 4px solid var(--accent-indigo);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Total de Fornecedores</h3>
+        <div id="kpi-total-suppliers" class="number" style="font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Cadastrados no sistema</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--success-text);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Fornecedores Ativos</h3>
+        <div id="kpi-active-suppliers" class="number" style="color: var(--success-text); font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Aptos para compras</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--text-muted);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Fornecedores Inativos</h3>
+        <div id="kpi-inactive-suppliers" class="number" style="color: var(--text-muted); font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Cadastro inativo</p>
+    </div>
+</div>
+
+<!-- Formulário Dinâmico: Cadastro e Edição -->
+<div class="panel" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 id="form-title" style="margin: 0;">Novo fornecedor</h2>
+        <span id="edit-badge" class="badge badge-warning" style="display: none;">Modo de Edição</span>
+    </div>
 
     <form id="supplier-form">
+        <input type="hidden" id="supplier-id" value="">
+
         <div class="form-grid">
             <label>
-                Nome
-                <input id="name" type="text" maxlength="120" required>
+                Razão Social / Nome Fantasia
+                <input id="name" type="text" maxlength="120" required placeholder="Ex.: Distribuidora Sul LTDA">
             </label>
 
             <label>
-                CPF/CNPJ
-                <input id="document" type="text" maxlength="20" required>
+                CNPJ / CPF
+                <input id="document" type="text" maxlength="20" required placeholder="Apenas números ou formatado">
             </label>
 
             <label>
-                E-mail
-                <input id="email" type="email" maxlength="120">
+                E-mail de Contato
+                <input id="email" type="email" maxlength="120" placeholder="vendas@fornecedor.com">
             </label>
 
             <label>
-                Telefone
-                <input id="phone" type="text" maxlength="30">
+                Telefone / WhatsApp
+                <input id="phone" type="text" maxlength="30" placeholder="(00) 90000-0000">
             </label>
         </div>
 
-        <div class="actions">
-            <button type="submit">Cadastrar fornecedor</button>
-            <button id="clear-button" class="secondary" type="button">
+        <div class="actions" style="margin-top: 16px;">
+            <button id="submit-button" class="btn" type="submit">Cadastrar fornecedor</button>
+            <button id="clear-button" class="btn btn-secondary" type="button">
                 Limpar
+            </button>
+            <button id="cancel-edit-button" class="btn btn-secondary" type="button" style="display: none; background: var(--border-color);">
+                Cancelar Edição
             </button>
         </div>
     </form>
 </div>
 
+<!-- Tabela de Fornecedores Cadastrados -->
 <div class="panel">
-    <div class="page-header">
-        <h2>Fornecedores cadastrados</h2>
-
-        <button id="reload-button" class="secondary" type="button">
-            ↻ Atualizar dados
-        </button>
+    <div class="page-header" style="margin-bottom: 16px;">
+        <div>
+            <h2 style="margin: 0;">Fornecedores Cadastrados</h2>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Consulte e edite contatos de fornecedores parceiros.</p>
+        </div>
     </div>
 
-    <div class="filters">
+    <div class="filters" style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
         <input
             id="search-input"
             type="search"
-            placeholder="Buscar por nome, documento ou e-mail"
+            placeholder="Buscar por nome, documento ou e-mail..."
+            style="flex: 1; min-width: 200px;"
         >
 
-        <select id="status-filter">
-            <option value="all">Todos</option>
+        <select id="status-filter" style="min-width: 180px;">
+            <option value="all">Todos os Fornecedores</option>
             <option value="active">Ativos</option>
             <option value="inactive">Inativos</option>
         </select>
     </div>
 
     <div class="table-wrapper">
-        <table>
+        <table class="table">
             <thead>
                 <tr>
-                    <th>Nome</th>
+                    <th>Nome / Razão Social</th>
                     <th>Documento</th>
                     <th>E-mail</th>
                     <th>Telefone</th>
                     <th>Status</th>
-                    <th>Ações</th>
+                    <th style="text-align: right;">Ações</th>
                 </tr>
             </thead>
 
@@ -90,12 +126,22 @@
 
 <script>
     const form = document.getElementById("supplier-form");
+    const supplierIdInput = document.getElementById("supplier-id");
+    const formTitle = document.getElementById("form-title");
+    const editBadge = document.getElementById("edit-badge");
+    const submitButton = document.getElementById("submit-button");
+    const cancelEditButton = document.getElementById("cancel-edit-button");
+
     const table = document.getElementById("suppliers-table");
     const message = document.getElementById("message");
     const searchInput = document.getElementById("search-input");
     const statusFilter = document.getElementById("status-filter");
     const reloadButton = document.getElementById("reload-button");
     const clearButton = document.getElementById("clear-button");
+
+    const kpiTotalSuppliers = document.getElementById("kpi-total-suppliers");
+    const kpiActiveSuppliers = document.getElementById("kpi-active-suppliers");
+    const kpiInactiveSuppliers = document.getElementById("kpi-inactive-suppliers");
 
     let suppliers = [];
 
@@ -105,7 +151,17 @@
 
         setTimeout(() => {
             message.className = "message";
-        }, 3000);
+        }, 3500);
+    }
+
+    function updateKPIs(data) {
+        const total = data.length;
+        const active = data.filter(s => s.is_active).length;
+        const inactive = total - active;
+
+        kpiTotalSuppliers.textContent = total;
+        kpiActiveSuppliers.textContent = active;
+        kpiInactiveSuppliers.textContent = inactive;
     }
 
     function renderSuppliers() {
@@ -129,7 +185,7 @@
         if (!filtered.length) {
             table.innerHTML = `
                 <tr>
-                    <td colspan="6" class="empty">
+                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
                         Nenhum fornecedor encontrado.
                     </td>
                 </tr>
@@ -137,33 +193,48 @@
             return;
         }
 
-        table.innerHTML = filtered.map(supplier => `
-            <tr>
-                <td>${supplier.name || ""}</td>
-                <td>${supplier.document || ""}</td>
-                <td>${supplier.email || ""}</td>
-                <td>${supplier.phone || ""}</td>
-                <td>
-                    <span class="status ${
-                        supplier.is_active ? "active" : "inactive"
-                    }">
-                        ${supplier.is_active ? "Ativo" : "Inativo"}
-                    </span>
-                </td>
-                <td>
-                    <button
-                        type="button"
-                        class="secondary"
-                        onclick="toggleSupplier(
-                            ${supplier.id},
-                            ${supplier.is_active}
-                        )"
-                    >
-                        ${supplier.is_active ? "Desativar" : "Ativar"}
-                    </button>
-                </td>
-            </tr>
-        `).join("");
+        table.innerHTML = filtered.map(supplier => {
+            const phoneClean = (supplier.phone || "").replace(/\D/g, "");
+            const waLink = phoneClean.length >= 10 ? `https://wa.me/55${phoneClean}` : null;
+
+            return `
+                <tr>
+                    <td><strong>${supplier.name || ""}</strong></td>
+                    <td>${supplier.document || ""}</td>
+                    <td>${supplier.email ? `<a href="mailto:${supplier.email}" style="color: var(--accent-indigo);">${supplier.email}</a>` : "-"}</td>
+                    <td>
+                        ${supplier.phone || "-"}
+                        ${waLink ? `<a href="${waLink}" target="_blank" style="margin-left: 6px; text-decoration: none; font-size: 12px;" title="Conversar no WhatsApp">💬</a>` : ""}
+                    </td>
+                    <td>
+                        <span class="status ${supplier.is_active ? "active" : "inactive"}">
+                            ${supplier.is_active ? "Ativo" : "Inativo"}
+                        </span>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: flex; justify-content: flex-end; gap: 6px; flex-wrap: wrap;">
+                            <button
+                                type="button"
+                                class="btn btn-secondary"
+                                style="padding: 4px 8px; font-size: 12px;"
+                                onclick="editSupplier(${supplier.id})"
+                            >
+                                ✏️ Editar
+                            </button>
+
+                            <button
+                                type="button"
+                                class="btn btn-secondary"
+                                style="padding: 4px 8px; font-size: 12px;"
+                                onclick="toggleSupplier(${supplier.id}, ${supplier.is_active})"
+                            >
+                                ${supplier.is_active ? "Desativar" : "Ativar"}
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join("");
     }
 
     async function loadSuppliers() {
@@ -178,12 +249,11 @@
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(
-                    data.error || "Não foi possível carregar os fornecedores."
-                );
+                throw new Error(data.error || "Não foi possível carregar os fornecedores.");
             }
 
             suppliers = data;
+            updateKPIs(suppliers);
             renderSuppliers();
         } catch (error) {
             showMessage(error.message, "error");
@@ -193,8 +263,39 @@
         }
     }
 
-    async function createSupplier(event) {
+    function editSupplier(id) {
+        const supplier = suppliers.find(s => s.id === id);
+        if (!supplier) return;
+
+        supplierIdInput.value = supplier.id;
+        document.getElementById("name").value = supplier.name || "";
+        document.getElementById("document").value = supplier.document || "";
+        document.getElementById("email").value = supplier.email || "";
+        document.getElementById("phone").value = supplier.phone || "";
+
+        formTitle.textContent = `Editar Fornecedor: ${supplier.name}`;
+        editBadge.style.display = "inline-block";
+        submitButton.textContent = "Salvar Alterações";
+        cancelEditButton.style.display = "inline-block";
+
+        window.scrollTo({ top: form.offsetTop - 80, behavior: "smooth" });
+    }
+
+    function resetFormState() {
+        form.reset();
+        supplierIdInput.value = "";
+
+        formTitle.textContent = "Novo fornecedor";
+        editBadge.style.display = "none";
+        submitButton.textContent = "Cadastrar fornecedor";
+        cancelEditButton.style.display = "none";
+    }
+
+    async function handleFormSubmit(event) {
         event.preventDefault();
+
+        const id = supplierIdInput.value;
+        const isEditing = Boolean(id);
 
         const payload = {
             name: document.getElementById("name").value.trim(),
@@ -204,24 +305,23 @@
         };
 
         try {
-            const response = await fetch("/suppliers", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+            const url = isEditing ? `/suppliers/${id}` : "/suppliers";
+            const method = isEditing ? "PATCH" : "POST";
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(
-                    data.error || "Não foi possível cadastrar o fornecedor."
-                );
+                throw new Error(data.error || "Não foi possível salvar o fornecedor.");
             }
 
-            showMessage("Fornecedor cadastrado com sucesso.");
-            form.reset();
+            showMessage(isEditing ? "Fornecedor atualizado com sucesso!" : "Fornecedor cadastrado com sucesso!");
+            resetFormState();
             await loadSuppliers();
         } catch (error) {
             showMessage(error.message, "error");
@@ -232,20 +332,14 @@
         try {
             const response = await fetch(`/suppliers/${id}`, {
                 method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    is_active: !currentStatus
-                })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_active: !currentStatus })
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(
-                    data.error || "Não foi possível alterar o status."
-                );
+                throw new Error(data.error || "Não foi possível alterar o status.");
             }
 
             showMessage("Status do fornecedor atualizado.");
@@ -255,12 +349,10 @@
         }
     }
 
-    form.addEventListener("submit", createSupplier);
+    form.addEventListener("submit", handleFormSubmit);
     reloadButton.addEventListener("click", loadSuppliers);
-
-    clearButton.addEventListener("click", () => {
-        form.reset();
-    });
+    clearButton.addEventListener("click", resetFormState);
+    cancelEditButton.addEventListener("click", resetFormState);
 
     searchInput.addEventListener("input", renderSuppliers);
     statusFilter.addEventListener("change", renderSuppliers);

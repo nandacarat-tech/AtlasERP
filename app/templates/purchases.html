@@ -5,66 +5,98 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h2>Compras</h2>
-        <p>Registre compras e acompanhe a entrada de produtos.</p>
+        <h2>Gestão de Compras & Entrada de Mercadorias</h2>
+        <p>Registre compras com fornecedores, adicione itens e confirme a entrada dos produtos no estoque.</p>
     </div>
+
+    <button id="reload-button" class="btn btn-secondary" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Atualizar dados
+    </button>
 </div>
 
 <div id="message" class="message"></div>
 
-<div class="panel">
-    <h2>Nova compra</h2>
+<!-- KPI Cards de Compras -->
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <div class="card" style="border-left: 4px solid var(--accent-indigo);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Total de Pedidos de Compra</h3>
+        <div id="kpi-total-purchases" class="number" style="font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Registrados com fornecedores</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--success-text);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Compras Recebidas (Estoque)</h3>
+        <div id="kpi-received-purchases" class="number" style="color: var(--success-text); font-size: 24px; font-weight: 700; margin: 6px 0;">R$ 0,00</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Total já adicionado ao estoque</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--warning-text);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Compras em Aberto</h3>
+        <div id="kpi-open-purchases" class="number" style="color: var(--warning-text); font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Aguardando recebimento/entrada</p>
+    </div>
+</div>
+
+<!-- Painel de Criação de Compra -->
+<div class="panel" style="margin-bottom: 24px;">
+    <h2 style="margin-top: 0; margin-bottom: 16px;">Iniciar Nova Compra</h2>
 
     <form id="purchase-form">
-        <label>
-            Fornecedor
-            <select id="supplier-id" required>
-                <option value="">Selecione um fornecedor</option>
-            </select>
-        </label>
+        <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+            <label style="flex: 1; min-width: 250px;">
+                Fornecedor Parceiro
+                <select id="supplier-id" required style="width: 100%; padding: 10px; margin-top: 4px;">
+                    <option value="">Selecione um fornecedor</option>
+                </select>
+            </label>
 
-        <button type="submit">Criar compra</button>
+            <button type="submit" class="btn" style="padding: 10px 20px;">
+                + Criar Pedido de Compra
+            </button>
+        </div>
     </form>
 </div>
 
-<div class="panel" id="items-panel" hidden>
-    <h2>Adicionar itens</h2>
-
-    <p>
-        Compra atual:
-        <strong id="current-purchase-id"></strong>
-    </p>
-
-    <div class="sale-item-form">
-        <label>
-            Produto
-            <select id="product-id">
-                <option value="">Selecione um produto</option>
-            </select>
-        </label>
-
-        <label>
-            Quantidade
-            <input id="quantity" type="number" min="1" value="1">
-        </label>
-
-        <label>
-            Custo unitário
-            <input id="unit-cost" type="number" min="0.01" step="0.01">
-        </label>
-
-        <button id="add-item-button" type="button">
-            Adicionar item
-        </button>
+<!-- Painel Dinâmico de Edição de Itens da Compra Ativa -->
+<div class="panel" id="items-panel" hidden style="margin-bottom: 24px; border: 1px solid var(--accent-indigo);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 style="margin: 0;">Adicionar Itens à Compra <strong id="current-purchase-id" style="color: var(--accent-cyan);"></strong></h2>
+        <span class="badge badge-info">Edição de Compra</span>
     </div>
 
-    <div class="table-wrapper">
-        <table>
+    <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+        <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+            <label style="flex: 2; min-width: 200px;">
+                Produto para Reposição
+                <select id="product-id" style="width: 100%; padding: 8px; margin-top: 4px;">
+                    <option value="">Selecione um produto</option>
+                </select>
+            </label>
+
+            <label style="flex: 1; min-width: 100px;">
+                Quantidade
+                <input id="quantity" type="number" min="1" value="1" style="width: 100%; padding: 8px; margin-top: 4px;">
+            </label>
+
+            <label style="flex: 1; min-width: 120px;">
+                Custo Unitário (R$)
+                <input id="unit-cost" type="number" min="0.01" step="0.01" placeholder="0,00" style="width: 100%; padding: 8px; margin-top: 4px;">
+            </label>
+
+            <button id="add-item-button" class="btn btn-secondary" type="button" style="padding: 8px 16px;">
+                + Incluir Item
+            </button>
+        </div>
+    </div>
+
+    <div class="table-wrapper" style="margin-bottom: 16px;">
+        <table class="table">
             <thead>
                 <tr>
                     <th>Produto</th>
                     <th>Quantidade</th>
-                    <th>Custo unitário</th>
+                    <th>Custo Unitário</th>
                     <th>Subtotal</th>
                 </tr>
             </thead>
@@ -72,44 +104,45 @@
         </table>
     </div>
 
-    <p class="sale-total">
-        Total:
-        <strong>R$ <span id="current-total">0,00</span></strong>
-    </p>
+    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); padding: 16px; border-radius: 8px;">
+        <div style="font-size: 16px;">
+            Total da Compra: <strong style="color: var(--accent-cyan); font-size: 22px; font-weight: 800;">R$ <span id="current-total">0,00</span></strong>
+        </div>
 
-    <button id="finish-button" class="secondary" type="button">
-        Fechar edição
-    </button>
-</div>
-
-<div class="panel">
-    <div class="page-header">
-        <h2>Compras registradas</h2>
-
-        <button id="reload-button" class="secondary" type="button">
-            ↻ Atualizar dados
+        <button id="finish-button" class="btn btn-secondary" type="button">
+            Concluir Edição de Itens
         </button>
     </div>
+</div>
 
-    <div class="filters">
-        <select id="status-filter">
-            <option value="">Todos os status</option>
-            <option value="OPEN">Abertas</option>
-            <option value="RECEIVED">Recebidas</option>
-            <option value="CANCELED">Canceladas</option>
+<!-- Tabela de Compras Registradas -->
+<div class="panel">
+    <div class="page-header" style="margin-bottom: 16px;">
+        <div>
+            <h2 style="margin: 0;">Histórico de Compras</h2>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Acompanhe o status e dê entrada das mercadorias no seu estoque.</p>
+        </div>
+    </div>
+
+    <div class="filters" style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+        <select id="status-filter" style="min-width: 200px;">
+            <option value="">Todos os Status de Compra</option>
+            <option value="OPEN">Compras em Aberto</option>
+            <option value="RECEIVED">Compras Recebidas (Estoque Atualizado)</option>
+            <option value="CANCELED">Compras Canceladas</option>
         </select>
     </div>
 
     <div class="table-wrapper">
-        <table>
+        <table class="table">
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>Nº Compra</th>
                     <th>Fornecedor</th>
                     <th>Status</th>
                     <th>Itens</th>
-                    <th>Total</th>
-                    <th>Ações</th>
+                    <th>Valor Total</th>
+                    <th style="text-align: right;">Ações de Controle</th>
                 </tr>
             </thead>
             <tbody id="purchases-table"></tbody>
@@ -130,18 +163,21 @@
     const itemsTable = document.getElementById("items-table");
     const purchasesTable = document.getElementById("purchases-table");
     const statusFilter = document.getElementById("status-filter");
+    const reloadButton = document.getElementById("reload-button");
+
+    const kpiTotalPurchases = document.getElementById("kpi-total-purchases");
+    const kpiReceivedPurchases = document.getElementById("kpi-received-purchases");
+    const kpiOpenPurchases = document.getElementById("kpi-open-purchases");
 
     let suppliers = [];
     let products = [];
     let activePurchase = null;
+    let allPurchases = [];
 
     function showMessage(text, type = "success") {
         message.textContent = text;
         message.className = `message ${type}`;
-
-        setTimeout(() => {
-            message.className = "message";
-        }, 3000);
+        setTimeout(() => message.className = "message", 3500);
     }
 
     function money(value) {
@@ -176,7 +212,7 @@
                 .filter(supplier => supplier.is_active)
                 .map(supplier => `
                     <option value="${supplier.id}">
-                        ${supplier.name} - ${supplier.document}
+                        ${supplier.name} (${supplier.document})
                     </option>
                 `).join("")}
         `;
@@ -187,7 +223,7 @@
                 .filter(product => product.is_active)
                 .map(product => `
                     <option value="${product.id}">
-                        ${product.name}
+                        ${product.name} (Estoque Atual: ${product.stock_quantity})
                     </option>
                 `).join("")}
         `;
@@ -206,8 +242,8 @@
         if (!activePurchase.items.length) {
             itemsTable.innerHTML = `
                 <tr>
-                    <td colspan="4" class="empty">
-                        Nenhum item adicionado.
+                    <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 16px;">
+                        Nenhum item adicionado à compra ainda.
                     </td>
                 </tr>
             `;
@@ -216,10 +252,10 @@
 
         itemsTable.innerHTML = activePurchase.items.map(item => `
             <tr>
-                <td>${productName(item.product_id)}</td>
-                <td>${item.quantity}</td>
+                <td><strong>${productName(item.product_id)}</strong></td>
+                <td>${item.quantity} unid.</td>
                 <td>R$ ${money(item.unit_cost)}</td>
-                <td>R$ ${money(item.subtotal)}</td>
+                <td><strong>R$ ${money(item.subtotal)}</strong></td>
             </tr>
         `).join("");
     }
@@ -228,33 +264,31 @@
         event.preventDefault();
 
         const supplierId = Number(supplierSelect.value);
-
         if (!supplierId) {
             showMessage("Selecione um fornecedor.", "error");
             return;
         }
 
-        const response = await fetch("/purchases", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                supplier_id: supplierId
-            })
-        });
+        try {
+            const response = await fetch("/purchases", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ supplier_id: supplierId })
+            });
 
-        const data = await response.json();
+            const data = await response.json();
 
-        if (!response.ok) {
-            showMessage(data.error || "Erro ao criar compra.", "error");
-            return;
+            if (!response.ok) {
+                throw new Error(data.error || "Erro ao criar compra.");
+            }
+
+            activePurchase = data;
+            showMessage("Compra criada. Agora adicione os produtos.");
+            renderActivePurchase();
+            await loadPurchases();
+        } catch (error) {
+            showMessage(error.message, "error");
         }
-
-        activePurchase = data;
-        showMessage("Compra criada. Agora adicione os itens.");
-        renderActivePurchase();
-        await loadPurchases();
     }
 
     async function addPurchaseItem() {
@@ -277,115 +311,183 @@
             return;
         }
 
-        const response = await fetch(
-            `/purchases/${activePurchase.id}/items`,
-            {
+        try {
+            const response = await fetch(`/purchases/${activePurchase.id}/items`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     product_id: productId,
                     quantity: quantity,
                     unit_cost: unitCost
                 })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Erro ao adicionar item.");
             }
-        );
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            showMessage(data.error || "Erro ao adicionar item.", "error");
-            return;
+            activePurchase = data;
+            productSelect.value = "";
+            quantityInput.value = 1;
+            unitCostInput.value = "";
+            renderActivePurchase();
+            await loadPurchases();
+            showMessage("Item adicionado à compra com sucesso!");
+        } catch (error) {
+            showMessage(error.message, "error");
         }
+    }
 
-        activePurchase = data;
-        productSelect.value = "";
-        quantityInput.value = 1;
-        unitCostInput.value = "";
-        renderActivePurchase();
-        await loadPurchases();
-        showMessage("Item adicionado à compra.");
+    function updateKPIs(purchases) {
+        const total = purchases.length;
+        let receivedTotal = 0;
+        let openCount = 0;
+
+        purchases.forEach(p => {
+            if (p.status === "RECEIVED") {
+                receivedTotal += Number(p.total_amount || 0);
+            } else if (p.status === "OPEN") {
+                openCount++;
+            }
+        });
+
+        kpiTotalPurchases.textContent = total;
+        kpiReceivedPurchases.textContent = `R$ ${money(receivedTotal)}`;
+        kpiOpenPurchases.textContent = openCount;
     }
 
     async function loadPurchases() {
         const status = statusFilter.value;
-        const url = status
-            ? `/purchases?status=${encodeURIComponent(status)}`
-            : "/purchases";
+        const url = status ? `/purchases?status=${encodeURIComponent(status)}` : "/purchases";
 
-        const response = await fetch(url, { cache: "no-store" });
-        const data = await response.json();
+        try {
+            const response = await fetch(url, { cache: "no-store" });
+            const data = await response.json();
 
-        if (!response.ok) {
-            showMessage(data.error || "Erro ao carregar compras.", "error");
-            return;
+            if (!response.ok) {
+                throw new Error(data.error || "Erro ao carregar compras.");
+            }
+
+            allPurchases = Array.isArray(data) ? data : (data.items || []);
+            updateKPIs(allPurchases);
+
+            purchasesTable.innerHTML = allPurchases.length
+                ? allPurchases.map(purchase => {
+                    let badgeHtml = '';
+                    if (purchase.status === 'RECEIVED') {
+                        badgeHtml = '<span class="badge badge-success">Recebida (Estoque Ok)</span>';
+                    } else if (purchase.status === 'OPEN') {
+                        badgeHtml = '<span class="badge badge-warning">Em Aberto</span>';
+                    } else if (purchase.status === 'CANCELED' || purchase.status === 'CANCELLED') {
+                        badgeHtml = '<span class="badge badge-danger">Cancelada</span>';
+                    } else {
+                        badgeHtml = `<span class="badge badge-info">${purchase.status}</span>`;
+                    }
+
+                    return `
+                        <tr>
+                            <td><strong>#${purchase.id}</strong></td>
+                            <td>${supplierName(purchase.supplier_id)}</td>
+                            <td>${badgeHtml}</td>
+                            <td>${purchase.items ? purchase.items.length : 0} item(ns)</td>
+                            <td><strong>R$ ${money(purchase.total_amount)}</strong></td>
+                            <td style="text-align: right;">
+                                <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                                    ${purchase.status === 'OPEN' ? `
+                                        <button
+                                            type="button"
+                                            class="btn"
+                                            style="padding: 4px 10px; font-size: 12px;"
+                                            onclick="receivePurchase(${purchase.id})"
+                                        >
+                                            📦 Dar Entrada no Estoque
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="btn btn-secondary"
+                                            style="padding: 4px 10px; font-size: 12px;"
+                                            onclick="openPurchase(${purchase.id})"
+                                        >
+                                            ✏️ Editar Itens
+                                        </button>
+                                    ` : `
+                                        <button
+                                            type="button"
+                                            class="btn btn-secondary"
+                                            style="padding: 4px 10px; font-size: 12px;"
+                                            onclick="openPurchase(${purchase.id})"
+                                        >
+                                            Ver Itens
+                                        </button>
+                                    `}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join("")
+                : `
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
+                            Nenhuma compra encontrada.
+                        </td>
+                    </tr>
+                `;
+        } catch (error) {
+            showMessage(error.message, "error");
         }
+    }
 
-        purchasesTable.innerHTML = data.length
-            ? data.map(purchase => `
-                <tr>
-                    <td>#${purchase.id}</td>
-                    <td>${supplierName(purchase.supplier_id)}</td>
-                    <td>${purchase.status}</td>
-                    <td>${purchase.items.length}</td>
-                    <td>R$ ${money(purchase.total_amount)}</td>
-                    <td>
-                        <button
-                            type="button"
-                            class="secondary"
-                            onclick="openPurchase(${purchase.id})"
-                        >
-                            Abrir
-                        </button>
-                    </td>
-                </tr>
-            `).join("")
-            : `
-                <tr>
-                    <td colspan="6" class="empty">
-                        Nenhuma compra encontrada.
-                    </td>
-                </tr>
-            `;
+    async function receivePurchase(id) {
+        const confirmed = confirm("Confirmar o recebimento dos produtos desta compra? O estoque dos produtos será atualizado automaticamente.");
+        if (!confirmed) return;
+
+        try {
+            const response = await fetch(`/purchases/${id}/receive`, { method: "POST" });
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Erro ao dar entrada no estoque.");
+            }
+
+            showMessage("Entrada de estoque realizada com sucesso! Produtos atualizados.");
+            await loadPurchases();
+            await loadOptions();
+        } catch (error) {
+            showMessage(error.message, "error");
+        }
     }
 
     async function openPurchase(id) {
-        const response = await fetch(`/purchases/${id}`, {
-            cache: "no-store"
-        });
+        try {
+            const response = await fetch(`/purchases/${id}`, { cache: "no-store" });
+            const data = await response.json();
 
-        const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "Erro ao abrir compra.");
+            }
 
-        if (!response.ok) {
-            showMessage(data.error || "Erro ao abrir compra.", "error");
-            return;
+            activePurchase = data;
+            supplierSelect.value = data.supplier_id;
+            renderActivePurchase();
+            window.scrollTo({ top: itemsPanel.offsetTop - 80, behavior: "smooth" });
+        } catch (error) {
+            showMessage(error.message, "error");
         }
-
-        activePurchase = data;
-        supplierSelect.value = data.supplier_id;
-        renderActivePurchase();
     }
 
     purchaseForm.addEventListener("submit", createPurchase);
+    document.getElementById("add-item-button").addEventListener("click", addPurchaseItem);
+    document.getElementById("finish-button").addEventListener("click", () => {
+        activePurchase = null;
+        renderActivePurchase();
+    });
 
-    document
-        .getElementById("add-item-button")
-        .addEventListener("click", addPurchaseItem);
-
-    document
-        .getElementById("finish-button")
-        .addEventListener("click", () => {
-            activePurchase = null;
-            renderActivePurchase();
-        });
-
-    document
-        .getElementById("reload-button")
-        .addEventListener("click", async () => {
-            await loadOptions();
-            await loadPurchases();
-        });
+    reloadButton.addEventListener("click", async () => {
+        await loadOptions();
+        await loadPurchases();
+    });
 
     statusFilter.addEventListener("change", loadPurchases);
 

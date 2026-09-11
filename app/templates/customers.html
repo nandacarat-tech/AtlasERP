@@ -5,74 +5,111 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h2>Clientes</h2>
-        <p>Cadastre e acompanhe seus clientes.</p>
+        <h2>Gestão de Clientes</h2>
+        <p>Cadastre, edite dados de contato e acompanhe o histórico de seus clientes.</p>
     </div>
+
+    <button id="reload-button" class="btn btn-secondary" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Atualizar dados
+    </button>
 </div>
 
 <div id="message" class="message"></div>
 
-<div class="panel">
-    <h2>Novo cliente</h2>
+<!-- KPI Cards de Clientes -->
+<div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <div class="card" style="border-left: 4px solid var(--accent-indigo);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Total de Clientes</h3>
+        <div id="kpi-total-customers" class="number" style="font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Cadastrados no sistema</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--success-text);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Clientes Ativos</h3>
+        <div id="kpi-active-customers" class="number" style="color: var(--success-text); font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Aptos para compras</p>
+    </div>
+
+    <div class="card" style="border-left: 4px solid var(--text-muted);">
+        <h3 style="font-size: 13px; color: var(--text-muted);">Clientes Inativos</h3>
+        <div id="kpi-inactive-customers" class="number" style="color: var(--text-muted); font-size: 24px; font-weight: 700; margin: 6px 0;">0</div>
+        <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Cadastro inativo</p>
+    </div>
+</div>
+
+<!-- Formulário Dinâmico: Cadastro e Edição -->
+<div class="panel" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 id="form-title" style="margin: 0;">Novo cliente</h2>
+        <span id="edit-badge" class="badge badge-warning" style="display: none;">Modo de Edição</span>
+    </div>
 
     <form id="customer-form">
+        <input type="hidden" id="customer-id" value="">
+
         <div class="form-grid">
             <label>
-                Nome
-                <input id="name" name="name" type="text" required>
+                Nome Completo / Razão Social
+                <input id="name" name="name" type="text" required placeholder="Ex.: João Silva ou Empresa LTDA">
             </label>
 
             <label>
-                CPF/CNPJ
-                <input id="document" name="document" type="text" required>
+                CPF / CNPJ
+                <input id="document" name="document" type="text" required placeholder="Apenas números ou formatado">
             </label>
 
             <label>
                 E-mail
-                <input id="email" name="email" type="email">
+                <input id="email" name="email" type="email" placeholder="cliente@email.com">
             </label>
 
             <label>
-                Telefone
-                <input id="phone" name="phone" type="text">
+                Telefone / WhatsApp
+                <input id="phone" name="phone" type="text" placeholder="(00) 90000-0000">
             </label>
         </div>
 
-        <div class="actions">
-            <button type="submit">Cadastrar cliente</button>
+        <div class="actions" style="margin-top: 16px;">
+            <button id="submit-button" class="btn" type="submit">Cadastrar cliente</button>
 
-            <button id="clear-button" class="secondary" type="button">
+            <button id="clear-button" class="btn btn-secondary" type="button">
                 Limpar
+            </button>
+
+            <button id="cancel-edit-button" class="btn btn-secondary" type="button" style="display: none; background: var(--border-color);">
+                Cancelar Edição
             </button>
         </div>
     </form>
 </div>
 
+<!-- Tabela de Clientes Cadastrados -->
 <div class="panel">
-    <div class="page-header">
-        <h2>Clientes cadastrados</h2>
-
-        <button id="reload-button" class="secondary" type="button">
-            ↻ Atualizar dados
-        </button>
+    <div class="page-header" style="margin-bottom: 16px;">
+        <div>
+            <h2 style="margin: 0;">Clientes Cadastrados</h2>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Consulte e edite informações de contato dos seus clientes.</p>
+        </div>
     </div>
 
-    <div class="filters">
+    <div class="filters" style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
         <input
             id="search-input"
             type="search"
-            placeholder="Buscar por nome, documento ou e-mail"
+            placeholder="Buscar por nome, CPF/CNPJ ou e-mail..."
+            style="flex: 1; min-width: 200px;"
         >
 
-        <select id="status-filter">
-            <option value="all">Todos</option>
+        <select id="status-filter" style="min-width: 180px;">
+            <option value="all">Todos os Clientes</option>
             <option value="active">Ativos</option>
             <option value="inactive">Inativos</option>
         </select>
     </div>
 
     <div class="table-wrapper">
-        <table>
+        <table class="table">
             <thead>
                 <tr>
                     <th>Nome</th>
@@ -80,7 +117,7 @@
                     <th>E-mail</th>
                     <th>Telefone</th>
                     <th>Status</th>
-                    <th>Ações</th>
+                    <th style="text-align: right;">Ações</th>
                 </tr>
             </thead>
 
@@ -91,12 +128,22 @@
 
 <script>
     const form = document.getElementById("customer-form");
+    const customerIdInput = document.getElementById("customer-id");
+    const formTitle = document.getElementById("form-title");
+    const editBadge = document.getElementById("edit-badge");
+    const submitButton = document.getElementById("submit-button");
+    const cancelEditButton = document.getElementById("cancel-edit-button");
+
     const table = document.getElementById("customers-table");
     const message = document.getElementById("message");
     const reloadButton = document.getElementById("reload-button");
     const clearButton = document.getElementById("clear-button");
     const searchInput = document.getElementById("search-input");
     const statusFilter = document.getElementById("status-filter");
+
+    const kpiTotalCustomers = document.getElementById("kpi-total-customers");
+    const kpiActiveCustomers = document.getElementById("kpi-active-customers");
+    const kpiInactiveCustomers = document.getElementById("kpi-inactive-customers");
 
     let allCustomers = [];
 
@@ -106,7 +153,17 @@
 
         setTimeout(() => {
             message.className = "message";
-        }, 3000);
+        }, 3500);
+    }
+
+    function updateKPIs(customers) {
+        const total = customers.length;
+        const active = customers.filter(c => c.is_active).length;
+        const inactive = total - active;
+
+        kpiTotalCustomers.textContent = total;
+        kpiActiveCustomers.textContent = active;
+        kpiInactiveCustomers.textContent = inactive;
     }
 
     function renderCustomers(customers) {
@@ -134,7 +191,7 @@
         if (!filteredCustomers.length) {
             table.innerHTML = `
                 <tr>
-                    <td colspan="6" class="empty">
+                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
                         Nenhum cliente encontrado.
                     </td>
                 </tr>
@@ -142,33 +199,48 @@
             return;
         }
 
-        table.innerHTML = filteredCustomers.map(customer => `
-            <tr>
-                <td>${customer.name || ""}</td>
-                <td>${customer.document || ""}</td>
-                <td>${customer.email || ""}</td>
-                <td>${customer.phone || ""}</td>
-                <td>
-                    <span class="status ${
-                        customer.is_active ? "active" : "inactive"
-                    }">
-                        ${customer.is_active ? "Ativo" : "Inativo"}
-                    </span>
-                </td>
-                <td>
-                    <button
-                        type="button"
-                        class="secondary"
-                        onclick="toggleCustomer(
-                            ${customer.id},
-                            ${customer.is_active}
-                        )"
-                    >
-                        ${customer.is_active ? "Desativar" : "Ativar"}
-                    </button>
-                </td>
-            </tr>
-        `).join("");
+        table.innerHTML = filteredCustomers.map(customer => {
+            const phoneClean = (customer.phone || "").replace(/\D/g, "");
+            const waLink = phoneClean.length >= 10 ? `https://wa.me/55${phoneClean}` : null;
+
+            return `
+                <tr>
+                    <td><strong>${customer.name || ""}</strong></td>
+                    <td>${customer.document || ""}</td>
+                    <td>${customer.email ? `<a href="mailto:${customer.email}" style="color: var(--accent-indigo);">${customer.email}</a>` : "-"}</td>
+                    <td>
+                        ${customer.phone || "-"}
+                        ${waLink ? `<a href="${waLink}" target="_blank" style="margin-left: 6px; text-decoration: none; font-size: 12px;" title="Conversar no WhatsApp">💬</a>` : ""}
+                    </td>
+                    <td>
+                        <span class="status ${customer.is_active ? "active" : "inactive"}">
+                            ${customer.is_active ? "Ativo" : "Inativo"}
+                        </span>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: flex; justify-content: flex-end; gap: 6px; flex-wrap: wrap;">
+                            <button
+                                type="button"
+                                class="btn btn-secondary"
+                                style="padding: 4px 8px; font-size: 12px;"
+                                onclick="editCustomer(${customer.id})"
+                            >
+                                ✏️ Editar
+                            </button>
+
+                            <button
+                                type="button"
+                                class="btn btn-secondary"
+                                style="padding: 4px 8px; font-size: 12px;"
+                                onclick="toggleCustomer(${customer.id}, ${customer.is_active})"
+                            >
+                                ${customer.is_active ? "Desativar" : "Ativar"}
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join("");
     }
 
     async function loadCustomers() {
@@ -185,6 +257,7 @@
             }
 
             allCustomers = await response.json();
+            updateKPIs(allCustomers);
             renderCustomers(allCustomers);
         } catch (error) {
             showMessage(error.message, "error");
@@ -194,35 +267,65 @@
         }
     }
 
-    async function createCustomer(event) {
+    function editCustomer(id) {
+        const customer = allCustomers.find(c => c.id === id);
+        if (!customer) return;
+
+        customerIdInput.value = customer.id;
+        document.getElementById("name").value = customer.name || "";
+        document.getElementById("document").value = customer.document || "";
+        document.getElementById("email").value = customer.email || "";
+        document.getElementById("phone").value = customer.phone || "";
+
+        formTitle.textContent = `Editar Cliente: ${customer.name}`;
+        editBadge.style.display = "inline-block";
+        submitButton.textContent = "Salvar Alterações";
+        cancelEditButton.style.display = "inline-block";
+
+        window.scrollTo({ top: form.offsetTop - 80, behavior: "smooth" });
+    }
+
+    function resetFormState() {
+        form.reset();
+        customerIdInput.value = "";
+
+        formTitle.textContent = "Novo cliente";
+        editBadge.style.display = "none";
+        submitButton.textContent = "Cadastrar cliente";
+        cancelEditButton.style.display = "none";
+    }
+
+    async function handleFormSubmit(event) {
         event.preventDefault();
 
-        const customer = {
+        const id = customerIdInput.value;
+        const isEditing = Boolean(id);
+
+        const payload = {
             name: document.getElementById("name").value.trim(),
             document: document.getElementById("document").value.trim(),
-            email: document.getElementById("email").value.trim(),
-            phone: document.getElementById("phone").value.trim()
+            email: document.getElementById("email").value.trim() || null,
+            phone: document.getElementById("phone").value.trim() || null
         };
 
         try {
-            const response = await fetch("/customers", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(customer)
+            const url = isEditing ? `/customers/${id}` : "/customers";
+            const method = isEditing ? "PUT" : "POST";
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(
-                    data.error || "Não foi possível cadastrar o cliente."
-                );
+                throw new Error(data.error || "Não foi possível salvar o cliente.");
             }
 
-            showMessage("Cliente cadastrado com sucesso.");
-            form.reset();
+            showMessage(isEditing ? "Cliente atualizado com sucesso!" : "Cliente cadastrado com sucesso!");
+            resetFormState();
             await loadCustomers();
         } catch (error) {
             showMessage(error.message, "error");
@@ -233,20 +336,14 @@
         try {
             const response = await fetch(`/customers/${id}`, {
                 method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    is_active: !currentStatus
-                })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_active: !currentStatus })
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(
-                    data.error || "Não foi possível alterar o status."
-                );
+                throw new Error(data.error || "Não foi possível alterar o status.");
             }
 
             showMessage("Status do cliente atualizado.");
@@ -256,20 +353,13 @@
         }
     }
 
-    form.addEventListener("submit", createCustomer);
+    form.addEventListener("submit", handleFormSubmit);
     reloadButton.addEventListener("click", loadCustomers);
+    clearButton.addEventListener("click", resetFormState);
+    cancelEditButton.addEventListener("click", resetFormState);
 
-    clearButton.addEventListener("click", () => {
-        form.reset();
-    });
-
-    searchInput.addEventListener("input", () => {
-        renderCustomers(allCustomers);
-    });
-
-    statusFilter.addEventListener("change", () => {
-        renderCustomers(allCustomers);
-    });
+    searchInput.addEventListener("input", () => renderCustomers(allCustomers));
+    statusFilter.addEventListener("change", () => renderCustomers(allCustomers));
 
     loadCustomers();
 </script>
