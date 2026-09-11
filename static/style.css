@@ -315,40 +315,82 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
-/* Buttons */
-button, .btn {
+/* Buttons - Design System Unificado NandaTech */
+button, .btn, input[type="button"], input[type="submit"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 18px;
+  padding: 10px 20px;
+  font-family: var(--font-family);
   font-size: 14px;
   font-weight: 600;
   border-radius: var(--radius-sm);
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   cursor: pointer;
-  background-color: var(--primary);
-  color: white;
-  transition: all 0.2s ease;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  line-height: 1.4;
 }
 
-button:hover, .btn:hover {
-  background-color: var(--primary-hover);
-  transform: translateY(-1px);
+button:hover, .btn:hover, input[type="button"]:hover, input[type="submit"]:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+}
+
+button:active, .btn:active, input[type="button"]:active, input[type="submit"]:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 button.secondary, .btn-secondary {
-  background-color: #475569;
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }
+
 button.secondary:hover, .btn-secondary:hover {
-  background-color: #334155;
+  background: #334155 !important;
+  border-color: #475569 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  transform: translateY(-2px);
 }
 
 button.danger, .btn-danger {
-  background-color: #dc2626;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35) !important;
 }
+
 button.danger:hover, .btn-danger:hover {
-  background-color: #b91c1c;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5) !important;
+  transform: translateY(-2px);
+}
+
+button.success, .btn-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
+}
+
+button.success:hover, .btn-success:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5) !important;
+  transform: translateY(-2px);
+}
+
+/* Botões Pequenos em Tabelas */
+.btn-sm, .btn-small, table button {
+  padding: 6px 14px !important;
+  font-size: 13px !important;
+  border-radius: 6px !important;
 }
 
 /* ==========================================================================
