@@ -274,11 +274,12 @@ main {
 }
 
 .number {
-  font-size: clamp(18px, 2.2vw, 26px);
+  font-size: clamp(15px, 1.8vw, 22px);
   font-weight: 800;
   color: var(--primary);
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 1.25;
   margin: 4px 0;
 }
