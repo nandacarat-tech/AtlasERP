@@ -22,7 +22,7 @@
         <div class="card" style="border-left: 4px solid var(--success-text);">
             <h3 style="font-size: 13px; color: var(--text-muted);">Vendas (Dinheiro que Entrou)</h3>
             <div class="number" style="color: var(--success-text); font-size: 24px; font-weight: 700; margin: 8px 0;">
-                R$ {{ "%.2f"|format(total_revenue)|replace('.', ',') }}
+                R$ {{ total_revenue|currency_brl }}
             </div>
             <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Valor total de vendas confirmadas.</p>
         </div>
@@ -30,7 +30,7 @@
         <div class="card" style="border-left: 4px solid var(--danger-text);">
             <h3 style="font-size: 13px; color: var(--text-muted);">Contas & Custos (Dinheiro que Saiu)</h3>
             <div class="number" style="color: var(--danger-text); font-size: 24px; font-weight: 700; margin: 8px 0;">
-                R$ {{ "%.2f"|format(total_expenses)|replace('.', ',') }}
+                R$ {{ total_expenses|currency_brl }}
             </div>
             <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Total de despesas operacionais.</p>
         </div>
@@ -38,7 +38,7 @@
         <div class="card" style="border-left: 4px solid {% if net_result >= 0 %}var(--success-text){% else %}var(--danger-text){% endif %};">
             <h3 style="font-size: 13px; color: var(--text-muted);">Resultado do Negócio (Lucro)</h3>
             <div class="number" style="color: {% if net_result >= 0 %}var(--success-text){% else %}var(--danger-text){% endif %}; font-size: 24px; font-weight: 700; margin: 8px 0;">
-                R$ {{ "%.2f"|format(net_result)|replace('.', ',') }}
+                R$ {{ net_result|currency_brl }}
             </div>
             <p style="font-size: 12px; margin: 0;">
                 {% if net_result >= 0 %}
@@ -52,7 +52,7 @@
         <div class="card" style="border-left: 4px solid var(--accent-cyan);">
             <h3 style="font-size: 13px; color: var(--text-muted);">Dinheiro Guardado em Produtos</h3>
             <div class="number" style="color: var(--accent-cyan); font-size: 24px; font-weight: 700; margin: 8px 0;">
-                R$ {{ "%.2f"|format(inventory_capital)|replace('.', ',') }}
+                R$ {{ inventory_capital|currency_brl }}
             </div>
             <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Capital parado em estoque.</p>
         </div>
@@ -81,7 +81,7 @@
                 <span class="badge badge-danger" style="margin-bottom: 8px; display: inline-block;">Financeiro</span>
                 <h4 style="margin: 6px 0; font-size: 15px;">Contas a Pagar Pendentes</h4>
                 <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 12px 0;">
-                    Você tem <strong>{{ pending_bills_count }}</strong> conta(s) a pagar somando <strong>R$ {{ "%.2f"|format(pending_bills_amount)|replace('.', ',') }}</strong>.
+                    Você tem <strong>{{ pending_bills_count }}</strong> conta(s) a pagar somando <strong>R$ {{ pending_bills_amount|currency_brl }}</strong>.
                 </p>
             </div>
             <a href="/ui/financial/transactions" class="btn btn-secondary" style="align-self: flex-start; padding: 6px 12px; font-size: 12px;">Ver Contas a Pagar</a>
@@ -93,7 +93,7 @@
                 <span class="badge badge-success" style="margin-bottom: 8px; display: inline-block;">Financeiro</span>
                 <h4 style="margin: 6px 0; font-size: 15px;">Contas a Receber de Clientes</h4>
                 <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 12px 0;">
-                    Existem <strong>{{ pending_receivables_count }}</strong> recebimento(s) pendente(s) totalizando <strong>R$ {{ "%.2f"|format(pending_receivables_amount)|replace('.', ',') }}</strong>.
+                    Existem <strong>{{ pending_receivables_count }}</strong> recebimento(s) pendente(s) totalizando <strong>R$ {{ pending_receivables_amount|currency_brl }}</strong>.
                 </p>
             </div>
             <a href="/ui/financial/transactions" class="btn btn-secondary" style="align-self: flex-start; padding: 6px 12px; font-size: 12px;">Ver Recebimentos</a>
@@ -105,7 +105,7 @@
                 <span class="badge badge-info" style="margin-bottom: 8px; display: inline-block;">Folha de Pagamento</span>
                 <h4 style="margin: 6px 0; font-size: 15px;">Salários e Colaboradores</h4>
                 <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 12px 0;">
-                    Há <strong>{{ pending_payroll_count }}</strong> pagamento(s) de pessoal pendente(s) (R$ {{ "%.2f"|format(pending_payroll_amount)|replace('.', ',') }}).
+                    Há <strong>{{ pending_payroll_count }}</strong> pagamento(s) de pessoal pendente(s) (R$ {{ pending_payroll_amount|currency_brl }}).
                 </p>
             </div>
             <a href="/ui/financial/payroll" class="btn btn-secondary" style="align-self: flex-start; padding: 6px 12px; font-size: 12px;">Gerenciar Salários</a>
@@ -205,7 +205,7 @@
                             <td><strong>#{{ s.id }}</strong></td>
                             <td>{{ s.customer_name }}</td>
                             <td>{{ s['items']|length }} item(ns)</td>
-                            <td><strong>R$ {{ "%.2f"|format(s.total_amount|float)|replace('.', ',') }}</strong></td>
+                            <td><strong>R$ {{ s.total_amount|currency_brl }}</strong></td>
                             <td>
                                 {% if s.status == 'CONFIRMED' %}
                                     <span class="badge badge-success">Confirmada</span>
@@ -263,7 +263,7 @@
                         <tr>
                             <td><strong>{{ p.sku }}</strong></td>
                             <td>{{ p.name }}</td>
-                            <td>R$ {{ "%.2f"|format(p.price|float)|replace('.', ',') }}</td>
+                            <td>R$ {{ p.price|currency_brl }}</td>
                             <td><strong>{{ p.stock_quantity }}</strong> unid.</td>
                             <td style="width: 220px;">
                                 {% if p.stock_quantity == 0 %}

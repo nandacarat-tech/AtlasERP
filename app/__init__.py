@@ -19,6 +19,16 @@ def create_app(config_object=None):
     else:
         app.config.from_object(Config)
 
+    @app.template_filter('currency_brl')
+    def currency_brl_filter(val):
+        if val is None:
+            val = 0.0
+        try:
+            val = float(val)
+        except (ValueError, TypeError):
+            val = 0.0
+        return "{:,.2f}".format(val).replace(',', 'X').replace('.', ',').replace('X', '.')
+
     db.init_app(app)
     migrate.init_app(app, db)
 
