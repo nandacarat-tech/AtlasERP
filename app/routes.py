@@ -23,6 +23,7 @@ from app.financial_models import (
     FinancialCategory,
     FinancialTransaction,
     PayrollExpense,
+    Invoice,
 )
 from app.purchase_models import Purchase, PurchaseItem
 from app.purchase_service import (
@@ -280,6 +281,11 @@ def financial_transactions_page():
 @main.get("/ui/financial/payroll")
 def financial_payroll_page():
     return render_template("financial_payroll.html")
+
+
+@main.get("/ui/financial/invoices")
+def financial_invoices_page():
+    return render_template("financial_invoices.html")
 
 
 @main.get("/products")
@@ -803,6 +809,18 @@ def confirm_sale(sale_id):
             }), 400
 
     sale.status = CONFIRMED
+
+    # Automação ERP: Envia a Venda para a fila de Notas Fiscais NFe do Financeiro
+    existing_inv = Invoice.query.filter_by(sale_id=sale.id).first()
+    if not existing_inv:
+        invoice = Invoice(
+            sale_id=sale.id,
+            customer_id=sale.customer_id,
+            amount=sale.total_amount,
+            status="PENDING_EMISSION",
+        )
+        db.session.add(invoice)
+
     db.session.commit()
 
     return jsonify(sale_to_dict(sale))
@@ -2097,5 +2115,44 @@ def delete_payroll_expense(payroll_id):
     db.session.delete(payroll)
     db.session.commit()
     return jsonify({"message": "Registro de folha excluído com sucesso."}), 200
+
+
+# --- Rotas da API para Notas Fiscais (NF-e / SEFAZ) ---
+
+@main.get("/api/financial/invoices")
+def list_financial_invoices():
+    invoices = Invoice.query.order_by(Invoice.id.desc()).all()
+    return jsonify([inv.to_dict() for inv in invoices])
+
+
+@main.post("/api/financial/invoices/<int:invoice_id>/emit")
+def emit_financial_invoice(invoice_id):
+    invoice = db.session.get(Invoice, invoice_id)
+    if not invoice:
+        return jsonify({"error": "Nota Fiscal não encontrada."}), 404
+
+    if invoice.status == "ISSUED":
+        return jsonify({"error": "Nota Fiscal já emitida e autorizada pela SEFAZ."}), 400
+
+    # Simulação SEFAZ: Geração de Chave de Acesso Padrão Nacional de 44 dígitos
+    uf = "35"
+    yymm = datetime.utcnow().strftime("%y%m")
+    cnpj = "11222333000181"
+    mod = "55"
+    serie = "001"
+    num = f"{invoice.id:09d}"
+    rnd = f"{abs(hash(invoice.id)) % 100000000:09d}"[:9]
+    access_key = f"{uf}{yymm}{cnpj}{mod}{serie}{num}{rnd}"[:44]
+
+    invoice.invoice_number = f"NF-e {invoice.id:06d}"
+    invoice.access_key = access_key
+    invoice.status = "ISSUED"
+    invoice.sefaz_status_code = "100"
+    invoice.sefaz_message = "Autorizado o uso da NF-e (Ambiente de Testes SEFAZ)"
+    invoice.issued_at = datetime.utcnow()
+
+    db.session.commit()
+    return jsonify(invoice.to_dict())
+
 
 

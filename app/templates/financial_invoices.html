@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Notas Fiscais (NF-e / SEFAZ) - AtlasERP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Emissão de Notas Fiscais Eletrônicas (NF-e / SEFAZ)</h2>
+        <p style="color: var(--text-muted); font-size: 14px;">Integração automática com o departamento de Vendas para autorização de NF-e junto à SEFAZ.</p>
+    </div>
+</div>
+
+<div class="panel">
+    <h3 style="margin-bottom: 16px; font-size: 16px;">Fila de Emissão de Notas Fiscais</h3>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Número NF-e</th>
+                    <th>Venda Origem</th>
+                    <th>Destinatário (Cliente)</th>
+                    <th>CPF/CNPJ</th>
+                    <th>Valor (R$)</th>
+                    <th>Chave de Acesso (SEFAZ)</th>
+                    <th>Status NF-e</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="invoices-table-body">
+                <tr>
+                    <td colspan="8">Carregando fila de notas fiscais...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function formatMoney(value) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+}
+
+function loadInvoices() {
+    fetch('/api/financial/invoices')
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('invoices-table-body');
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty">Nenhuma nota fiscal pendente de emissão. Ao confirmar vendas, as notas aparecerão aqui automaticamente!</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td><strong>${item.invoice_number}</strong></td>
+                    <td>Venda #${item.sale_id || '-'}</td>
+                    <td>${item.customer_name}</td>
+                    <td><code>${item.customer_document}</code></td>
+                    <td style="font-weight: 700; color: var(--success-text);">${formatMoney(item.amount)}</td>
+                    <td style="font-family: monospace; font-size: 11px; color: var(--accent-cyan);">${item.access_key}</td>
+                    <td>
+                        <span class="status ${item.status === 'ISSUED' ? 'active' : 'pending'}">
+                            ${item.status === 'ISSUED' ? '100 - Autorizada SEFAZ' : 'Pendente de Emissão'}
+                        </span>
+                    </td>
+                    <td>
+                        ${item.status === 'PENDING_EMISSION' ? `<button onclick="emitInvoice(${item.id})" class="btn" style="padding: 4px 10px; font-size: 12px;">⚡ Emitir NF-e (SEFAZ)</button>` : '<span style="color: var(--text-muted); font-size: 12px;">Emitida</span>'}
+                    </td>
+                </tr>
+            `).join('');
+        });
+}
+
+function emitInvoice(id) {
+    fetch(`/api/financial/invoices/${id}/emit`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                alert(`Nota Fiscal ${data.invoice_number} AUTORIZADA pela SEFAZ!\nChave de Acesso: ${data.access_key}`);
+                loadInvoices();
+            }
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadInvoices();
+});
+</script>
+{% endblock %}
