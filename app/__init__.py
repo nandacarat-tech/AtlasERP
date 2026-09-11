@@ -31,6 +31,7 @@ def create_app(config_object=None):
     from app import stock_movement_models
     from app import purchase_models
     from app import supplier_models
+    from app import financial_models
 
     # Agora que os modelos foram carregados e registrados, podemos importar as rotas.
     from app.routes import main

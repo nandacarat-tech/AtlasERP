@@ -19,6 +19,11 @@ from app.stock_movement_service import (
     apply_stock_out,
 )
 from app.supplier_models import Supplier
+from app.financial_models import (
+    FinancialCategory,
+    FinancialTransaction,
+    PayrollExpense,
+)
 from app.purchase_models import Purchase, PurchaseItem
 from app.purchase_service import (
     PurchaseError,
@@ -260,6 +265,21 @@ def suppliers_page():
 @main.get("/ui/purchases")
 def purchases_page():
     return render_template("purchases.html")
+
+
+@main.get("/ui/financial")
+def financial_page():
+    return render_template("financial.html")
+
+
+@main.get("/ui/financial/transactions")
+def financial_transactions_page():
+    return render_template("financial_transactions.html")
+
+
+@main.get("/ui/financial/payroll")
+def financial_payroll_page():
+    return render_template("financial_payroll.html")
 
 
 @main.get("/products")
@@ -1839,4 +1859,219 @@ def delete_fleet_route(route_id):
     db.session.commit()
 
     return jsonify({"message": "Rota excluída com sucesso."}), 200
+
+
+# --- Rotas da API para o Módulo Financeiro ---
+
+@main.get("/api/financial/summary")
+def get_financial_summary():
+    transactions = FinancialTransaction.query.filter_by(status="PAID").all()
+    pending_transactions = FinancialTransaction.query.filter_by(status="PENDING").all()
+    payrolls = PayrollExpense.query.filter_by(status="ACTIVE").all()
+
+    total_revenue = sum(t.amount for t in transactions if t.transaction_type == "REVENUE")
+    total_expenses = sum(t.amount for t in transactions if t.transaction_type == "EXPENSE")
+    total_payroll = sum(p.total_cost for p in payrolls)
+
+    fixed_costs = sum(t.amount for t in transactions if t.transaction_type == "EXPENSE" and t.category and t.category.category_type == "FIXED_COST")
+    variable_costs = sum(t.amount for t in transactions if t.transaction_type == "EXPENSE" and t.category and t.category.category_type == "VARIABLE_COST")
+
+    pending_payable = sum(t.amount for t in pending_transactions if t.transaction_type == "EXPENSE")
+    pending_receivable = sum(t.amount for t in pending_transactions if t.transaction_type == "REVENUE")
+
+    net_result = total_revenue - (total_expenses + total_payroll)
+
+    return jsonify({
+        "total_revenue": str(total_revenue),
+        "total_expenses": str(total_expenses),
+        "total_payroll": str(total_payroll),
+        "total_cost": str(total_expenses + total_payroll),
+        "fixed_costs": str(fixed_costs),
+        "variable_costs": str(variable_costs),
+        "pending_payable": str(pending_payable),
+        "pending_receivable": str(pending_receivable),
+        "net_result": str(net_result),
+    })
+
+
+@main.get("/api/financial/categories")
+def list_financial_categories():
+    categories = FinancialCategory.query.order_by(FinancialCategory.id).all()
+    if not categories:
+        default_cats = [
+            FinancialCategory(name="Aluguel e Condomínio", category_type="FIXED_COST", description="Custo Fixo de Instalações"),
+            FinancialCategory(name="Energia e Água", category_type="FIXED_COST", description="Utilidades básicas"),
+            FinancialCategory(name="Internet e Software", category_type="FIXED_COST", description="Sistemas e Conectividade"),
+            FinancialCategory(name="Insumos e Matéria Prima", category_type="VARIABLE_COST", description="Produção e Operação"),
+            FinancialCategory(name="Folha de Pagamento", category_type="PAYROLL", description="Salários e Encargos"),
+            FinancialCategory(name="Vendas e Serviços", category_type="REVENUE", description="Receitas operacionais"),
+        ]
+        db.session.add_all(default_cats)
+        db.session.commit()
+        categories = FinancialCategory.query.order_by(FinancialCategory.id).all()
+
+    return jsonify([c.to_dict() for c in categories])
+
+
+@main.post("/api/financial/categories")
+def create_financial_category():
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("name", "")).strip()
+    category_type = str(data.get("category_type", "FIXED_COST")).strip().upper()
+    if not name:
+        return jsonify({"error": "O nome da categoria é obrigatório."}), 400
+    if FinancialCategory.query.filter_by(name=name).first():
+        return jsonify({"error": "Categoria já existente."}), 409
+    category = FinancialCategory(name=name, category_type=category_type, description=data.get("description"))
+    db.session.add(category)
+    db.session.commit()
+    return jsonify(category.to_dict()), 201
+
+
+@main.get("/api/financial/transactions")
+def list_financial_transactions():
+    trans_type = request.args.get("type")
+    status = request.args.get("status")
+    query = FinancialTransaction.query.order_by(FinancialTransaction.due_date.desc(), FinancialTransaction.id.desc())
+    if trans_type:
+        query = query.filter_by(transaction_type=trans_type.upper())
+    if status:
+        query = query.filter_by(status=status.upper())
+    return jsonify([t.to_dict() for t in query.all()])
+
+
+@main.post("/api/financial/transactions")
+def create_financial_transaction():
+    data = request.get_json(silent=True) or {}
+    description = str(data.get("description", "")).strip()
+    amount_str = data.get("amount")
+    if not description or amount_str is None:
+        return jsonify({"error": "Descrição e valor são obrigatórios."}), 400
+    try:
+        amount = Decimal(str(amount_str))
+        if amount <= 0:
+            raise ValueError
+    except (InvalidOperation, ValueError, TypeError):
+        return jsonify({"error": "O valor deve ser um número positivo."}), 400
+    due_date = parse_optional_date(data.get("due_date"), "due_date") or date.today()
+    payment_date = parse_optional_date(data.get("payment_date"), "payment_date")
+    transaction = FinancialTransaction(
+        description=description,
+        amount=amount,
+        transaction_type=str(data.get("transaction_type", "EXPENSE")).upper(),
+        status=str(data.get("status", "PENDING")).upper(),
+        category_id=data.get("category_id"),
+        due_date=due_date,
+        payment_date=payment_date,
+        notes=data.get("notes"),
+    )
+    db.session.add(transaction)
+    db.session.commit()
+    return jsonify(transaction.to_dict()), 201
+
+
+@main.put("/api/financial/transactions/<int:trans_id>")
+def update_financial_transaction(trans_id):
+    transaction = db.session.get(FinancialTransaction, trans_id)
+    if not transaction:
+        return jsonify({"error": "Lançamento não encontrado."}), 404
+    data = request.get_json(silent=True) or {}
+    if "description" in data:
+        transaction.description = str(data["description"]).strip()
+    if "amount" in data:
+        try:
+            amt = Decimal(str(data["amount"]))
+            if amt <= 0:
+                raise ValueError
+            transaction.amount = amt
+        except Exception:
+            return jsonify({"error": "Valor inválido."}), 400
+    if "status" in data:
+        transaction.status = str(data["status"]).upper()
+    if "payment_date" in data:
+        transaction.payment_date = parse_optional_date(data["payment_date"], "payment_date")
+    if "category_id" in data:
+        transaction.category_id = data["category_id"]
+    if "notes" in data:
+        transaction.notes = data["notes"]
+    db.session.commit()
+    return jsonify(transaction.to_dict())
+
+
+@main.delete("/api/financial/transactions/<int:trans_id>")
+def delete_financial_transaction(trans_id):
+    transaction = db.session.get(FinancialTransaction, trans_id)
+    if not transaction:
+        return jsonify({"error": "Lançamento não encontrado."}), 404
+    db.session.delete(transaction)
+    db.session.commit()
+    return jsonify({"message": "Lançamento excluído com sucesso."}), 200
+
+
+@main.get("/api/financial/payroll")
+def list_payroll_expenses():
+    payrolls = PayrollExpense.query.order_by(PayrollExpense.id.desc()).all()
+    return jsonify([p.to_dict() for p in payrolls])
+
+
+@main.post("/api/financial/payroll")
+def create_payroll_expense():
+    data = request.get_json(silent=True) or {}
+    employee_name = str(data.get("employee_name", "")).strip()
+    role = str(data.get("role", "")).strip()
+    if not employee_name or not role:
+        return jsonify({"error": "Nome do colaborador e cargo são obrigatórios."}), 400
+    try:
+        base_salary = parse_optional_decimal(data.get("base_salary"), "base_salary") or Decimal("0.00")
+        charges_amount = parse_optional_decimal(data.get("charges_amount"), "charges_amount") or Decimal("0.00")
+        benefits_amount = parse_optional_decimal(data.get("benefits_amount"), "benefits_amount") or Decimal("0.00")
+    except ValueError as err:
+        return jsonify({"error": str(err)}), 400
+    payroll = PayrollExpense(
+        employee_name=employee_name,
+        role=role,
+        base_salary=base_salary,
+        charges_amount=charges_amount,
+        benefits_amount=benefits_amount,
+        status=str(data.get("status", "ACTIVE")).upper(),
+        notes=data.get("notes"),
+    )
+    db.session.add(payroll)
+    db.session.commit()
+    return jsonify(payroll.to_dict()), 201
+
+
+@main.put("/api/financial/payroll/<int:payroll_id>")
+def update_payroll_expense(payroll_id):
+    payroll = db.session.get(PayrollExpense, payroll_id)
+    if not payroll:
+        return jsonify({"error": "Colaborador/Folha não encontrado."}), 404
+    data = request.get_json(silent=True) or {}
+    if "employee_name" in data:
+        payroll.employee_name = str(data["employee_name"]).strip()
+    if "role" in data:
+        payroll.role = str(data["role"]).strip()
+    if "base_salary" in data:
+        payroll.base_salary = parse_optional_decimal(data["base_salary"], "base_salary") or Decimal("0.00")
+    if "charges_amount" in data:
+        payroll.charges_amount = parse_optional_decimal(data["charges_amount"], "charges_amount") or Decimal("0.00")
+    if "benefits_amount" in data:
+        payroll.benefits_amount = parse_optional_decimal(data["benefits_amount"], "benefits_amount") or Decimal("0.00")
+    if "status" in data:
+        payroll.status = str(data["status"]).upper()
+    if "notes" in data:
+        payroll.notes = data["notes"]
+    db.session.commit()
+    return jsonify(payroll.to_dict())
+
+
+@main.delete("/api/financial/payroll/<int:payroll_id>")
+def delete_payroll_expense(payroll_id):
+    payroll = db.session.get(PayrollExpense, payroll_id)
+    if not payroll:
+        return jsonify({"error": "Colaborador/Folha não encontrado."}), 404
+    db.session.delete(payroll)
+    db.session.commit()
+    return jsonify({"message": "Registro de folha excluído com sucesso."}), 200
+
 
