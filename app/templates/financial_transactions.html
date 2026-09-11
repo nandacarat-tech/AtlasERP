@@ -71,6 +71,22 @@
                 </select>
             </label>
         </div>
+
+        <!-- Opção de Lançamento Recorrente -->
+        <div style="grid-column: 1 / -1; display: flex; gap: 16px; align-items: center; background: rgba(59, 130, 246, 0.06); padding: 12px 16px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); margin-top: 12px; flex-wrap: wrap;">
+            <label style="flex-direction: row; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; color: var(--text-main); font-size: 14px;">
+                <input type="checkbox" id="is_recurring" style="width: 18px; height: 18px; cursor: pointer;">
+                🔁 Lançamento Recorrente (Repetir nos próximos meses)
+            </label>
+
+            <div id="recurring-months-container" style="display: none; align-items: center; gap: 8px;">
+                <label style="flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--text-main);">
+                    Repetir por quantos meses?
+                    <input type="number" id="recurring_months" min="2" max="36" value="2" style="width: 90px; padding: 6px 10px; font-size: 14px; font-weight: 700;">
+                </label>
+            </div>
+        </div>
+
         <div style="margin-top: 16px;">
             <button type="submit" class="btn">+ Salvar Lançamento</button>
         </div>
@@ -185,8 +201,17 @@ function deleteTransaction(id) {
         .then(() => loadTransactions());
 }
 
+const isRecurringCheckbox = document.getElementById('is_recurring');
+const recurringContainer = document.getElementById('recurring-months-container');
+if (isRecurringCheckbox) {
+    isRecurringCheckbox.addEventListener('change', function() {
+        recurringContainer.style.display = this.checked ? 'flex' : 'none';
+    });
+}
+
 document.getElementById('transaction-form').addEventListener('submit', function(e) {
     e.preventDefault();
+    const isRecurring = document.getElementById('is_recurring').checked;
     const payload = {
         description: document.getElementById('description').value,
         amount: document.getElementById('amount').value,
@@ -194,6 +219,8 @@ document.getElementById('transaction-form').addEventListener('submit', function(
         category_id: document.getElementById('category_id').value || null,
         due_date: document.getElementById('due_date').value,
         status: document.getElementById('status').value,
+        is_recurring: isRecurring,
+        recurring_months: isRecurring ? Number(document.getElementById('recurring_months').value || 1) : 1,
     };
 
     fetch('/api/financial/transactions', {
@@ -207,6 +234,7 @@ document.getElementById('transaction-form').addEventListener('submit', function(
             alert(data.error);
         } else {
             document.getElementById('transaction-form').reset();
+            if (recurringContainer) recurringContainer.style.display = 'none';
             loadTransactions();
         }
     });

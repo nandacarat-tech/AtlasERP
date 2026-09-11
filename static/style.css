@@ -241,7 +241,7 @@ main {
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 18px;
+  gap: 16px;
   margin-bottom: 24px;
 }
 
@@ -249,9 +249,15 @@ main {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 20px;
+  padding: 18px 20px;
   box-shadow: var(--shadow-md);
   transition: transform 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 105px;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .card:hover {
@@ -264,14 +270,17 @@ main {
   font-weight: 600;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-bottom: 8px;
-
+  margin-bottom: 6px;
 }
 
 .number {
-  font-size: 32px;
+  font-size: clamp(18px, 2.2vw, 26px);
   font-weight: 800;
   color: var(--primary);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  margin: 4px 0;
 }
 
 /* ==========================================================================

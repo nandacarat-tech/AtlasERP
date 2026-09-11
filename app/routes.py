@@ -2137,6 +2137,44 @@ def create_financial_transaction():
         return jsonify({"error": "O valor deve ser um número positivo."}), 400
     due_date = parse_optional_date(data.get("due_date"), "due_date") or date.today()
     payment_date = parse_optional_date(data.get("payment_date"), "payment_date")
+    is_recurring = bool(data.get("is_recurring"))
+    try:
+        recurring_months = int(data.get("recurring_months", 1) or 1)
+    except (ValueError, TypeError):
+        recurring_months = 1
+
+    if is_recurring and recurring_months > 1:
+        import calendar
+        created_items = []
+        base_date = due_date
+
+        for i in range(min(recurring_months, 36)):
+            target_year = base_date.year + (base_date.month + i - 1) // 12
+            target_month = (base_date.month + i - 1) % 12 + 1
+            max_days = calendar.monthrange(target_year, target_month)[1]
+            target_day = min(base_date.day, max_days)
+            item_due_date = date(target_year, target_month, target_day)
+
+            item_desc = f"{description} ({i + 1}/{recurring_months})"
+            item_status = str(data.get("status", "PENDING")).upper() if i == 0 else "PENDING"
+            item_pay_date = payment_date if (i == 0 and item_status == "PAID") else None
+
+            trans = FinancialTransaction(
+                description=item_desc,
+                amount=amount,
+                transaction_type=str(data.get("transaction_type", "EXPENSE")).upper(),
+                status=item_status,
+                category_id=data.get("category_id"),
+                due_date=item_due_date,
+                payment_date=item_pay_date,
+                notes=data.get("notes"),
+            )
+            db.session.add(trans)
+            created_items.append(trans)
+
+        db.session.commit()
+        return jsonify([t.to_dict() for t in created_items]), 201
+
     transaction = FinancialTransaction(
         description=description,
         amount=amount,

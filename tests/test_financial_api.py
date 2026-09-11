@@ -76,3 +76,26 @@ def test_financial_summary(client):
     assert "total_expenses" in data
     assert "total_payroll" in data
     assert "net_result" in data
+
+
+def test_recurring_financial_transactions(client, app):
+    res = client.post("/api/financial/transactions", json={
+        "description": "Aluguel Sede Recorrente",
+        "amount": "1500.00",
+        "transaction_type": "EXPENSE",
+        "status": "PAID",
+        "due_date": "2026-09-15",
+        "is_recurring": True,
+        "recurring_months": 3
+    })
+    assert res.status_code == 201
+    data = res.get_json()
+    assert isinstance(data, list)
+    assert len(data) == 3
+    assert data[0]["description"] == "Aluguel Sede Recorrente (1/3)"
+    assert data[0]["status"] == "PAID"
+    assert data[1]["description"] == "Aluguel Sede Recorrente (2/3)"
+    assert data[1]["status"] == "PENDING"
+    assert data[1]["due_date"] == "2026-10-15"
+    assert data[2]["description"] == "Aluguel Sede Recorrente (3/3)"
+    assert data[2]["due_date"] == "2026-11-15"

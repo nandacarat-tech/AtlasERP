@@ -209,7 +209,7 @@
         supplierSelect.innerHTML = `
             <option value="">Selecione um fornecedor</option>
             ${suppliers
-                .filter(supplier => supplier.is_active)
+                .filter(supplier => supplier.is_active !== false)
                 .map(supplier => `
                     <option value="${supplier.id}">
                         ${supplier.name} (${supplier.document})
@@ -220,7 +220,7 @@
         productSelect.innerHTML = `
             <option value="">Selecione um produto</option>
             ${products
-                .filter(product => product.is_active)
+                .filter(product => product.is_active !== false)
                 .map(product => `
                     <option value="${product.id}">
                         ${product.name} (Estoque Atual: ${product.stock_quantity})
@@ -239,7 +239,7 @@
         currentPurchaseId.textContent = `#${activePurchase.id}`;
         currentTotal.textContent = money(activePurchase.total_amount);
 
-        if (!activePurchase.items.length) {
+        if (!activePurchase.items || !activePurchase.items.length) {
             itemsTable.innerHTML = `
                 <tr>
                     <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 16px;">
@@ -265,7 +265,7 @@
 
         const supplierId = Number(supplierSelect.value);
         if (!supplierId) {
-            showMessage("Selecione um fornecedor.", "error");
+            showMessage("Selecione um fornecedor para iniciar a compra.", "error");
             return;
         }
 
@@ -283,7 +283,7 @@
             }
 
             activePurchase = data;
-            showMessage("Compra criada. Agora adicione os produtos.");
+            showMessage("Compra criada com sucesso! Agora inclua os produtos abaixo e depois clique em 'Dar Entrada no Estoque'.");
             renderActivePurchase();
             await loadPurchases();
         } catch (error) {
@@ -293,7 +293,7 @@
 
     async function addPurchaseItem() {
         if (!activePurchase) {
-            showMessage("Crie uma compra primeiro.", "error");
+            showMessage("Crie ou selecione uma compra primeiro.", "error");
             return;
         }
 
@@ -301,13 +301,18 @@
         const quantity = Number(quantityInput.value);
         const unitCost = Number(unitCostInput.value);
 
-        if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
-            showMessage("Informe produto e quantidade válidos.", "error");
+        if (!productId) {
+            showMessage("Selecione um produto para reposição.", "error");
+            return;
+        }
+
+        if (!quantity || !Number.isInteger(quantity) || quantity <= 0) {
+            showMessage("Informe uma quantidade válida (número inteiro maior que zero).", "error");
             return;
         }
 
         if (!unitCost || unitCost <= 0) {
-            showMessage("Informe um custo unitário válido.", "error");
+            showMessage("Informe um custo unitário válido (valor numérico positivo).", "error");
             return;
         }
 
@@ -386,12 +391,19 @@
                         badgeHtml = `<span class="badge badge-info">${purchase.status}</span>`;
                     }
 
+                    let itemsHtml = '<span style="color: var(--text-muted); font-size: 12px;">Sem itens</span>';
+                    if (purchase.items && purchase.items.length > 0) {
+                        itemsHtml = '<div style="font-size: 13px; line-height: 1.4;">' +
+                            purchase.items.map(i => `<div>• <strong>${productName(i.product_id)}</strong> (${i.quantity} unid. x R$ ${money(i.unit_cost)})</div>`).join('') +
+                            '</div>';
+                    }
+
                     return `
                         <tr>
                             <td><strong>#${purchase.id}</strong></td>
                             <td>${supplierName(purchase.supplier_id)}</td>
                             <td>${badgeHtml}</td>
-                            <td>${purchase.items ? purchase.items.length : 0} item(ns)</td>
+                            <td>${itemsHtml}</td>
                             <td><strong>R$ ${money(purchase.total_amount)}</strong></td>
                             <td style="text-align: right;">
                                 <div style="display: flex; justify-content: flex-end; gap: 6px;">
@@ -440,6 +452,12 @@
     }
 
     async function receivePurchase(id) {
+        const purchase = allPurchases.find(p => p.id === id);
+        if (purchase && (!purchase.items || purchase.items.length === 0)) {
+            showMessage("Esta compra não possui itens adicionados. Adicione produtos antes de dar entrada no estoque.", "error");
+            return;
+        }
+
         const confirmed = confirm("Confirmar o recebimento dos produtos desta compra? O estoque dos produtos será atualizado automaticamente.");
         if (!confirmed) return;
 
@@ -452,6 +470,8 @@
             }
 
             showMessage("Entrada de estoque realizada com sucesso! Produtos atualizados.");
+            activePurchase = null;
+            renderActivePurchase();
             await loadPurchases();
             await loadOptions();
         } catch (error) {
