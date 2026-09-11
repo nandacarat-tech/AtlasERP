@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Rotas da Frota - AtlasERP{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <div>
+            <h2>Rotas da Frota</h2>
+            <p>Gerencie e otimize as rotas dos seus veículos.</p>
+        </div>
+        <button id="reload-button" type="button">Atualizar</button>
+    </div>
+
+    <div id="message" class="message"></div>
+
+    <!-- Seção de Nova Rota -->
+    <section class="panel">
+        <h3>Nova Rota</h3>
+
+        <form id="route-form">
+            <div class="form-grid">
+                <label>
+                    Nome da Rota
+                    <input id="route_name" required>
+                </label>
+
+                <label>
+                    Veículo Designado
+                    <select id="route_vehicle_id">
+                        <option value="">Selecione um veículo</option>
+                    </select>
+                </label>
+
+                <label>
+                    Motorista Designado
+                    <select id="route_driver_id">
+                        <option value="">Selecione um motorista</option>
+                    </select>
+                </label>
+
+                <label>
+                    Data de Início
+                    <input id="start_date" type="date" required>
+                </label>
+
+                <label>
+                    Data de Fim
+                    <input id="end_date" type="date">
+                </label>
+
+                <label>
+                    Status
+                    <select id="route_status">
+                        <option value="PENDING">Pendente</option>
+                        <option value="IN_PROGRESS">Em Progresso</option>
+                        <option value="COMPLETED">Concluída</option>
+                        <option value="CANCELLED">Cancelada</option>
+                    </select>
+                </label>
+            </div>
+
+            <label>
+                Descrição
+                <textarea id="route_description" rows="3"></textarea>
+            </label>
+
+            <button type="submit">Cadastrar Rota</button>
+        </form>
+    </section>
+
+    <!-- Seção de Rotas Cadastradas -->
+    <section class="panel">
+        <h3>Rotas Cadastradas</h3>
+
+        <div id="routes-status" class="empty">Carregando rotas...</div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Veículo</th>
+                        <th>Motorista</th>
+                        <th>Início</th>
+                        <th>Fim</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="routes-table-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Se você tiver um modal de edição de rotas, ele também viria aqui -->
+
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        // Variáveis globais para os elementos da tabela de rotas
+        const routesTableBody = document.getElementById("routes-table-body");
+        const routeForm = document.getElementById("route-form");
+        const routeVehicleSelect = document.getElementById("route_vehicle_id");
+        const routeDriverSelect = document.getElementById("route_driver_id");
+
+        // Função auxiliar para escapar HTML e prevenir XSS
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replaceAll("&", "&")
+                .replaceAll("<", "<")
+                .replaceAll(">", ">")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        // Funções para Rotas
+        function renderRoutes(routes) {
+            const routesStatusDiv = document.getElementById("routes-status");
+            if (!routes.length) {
+                routesTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7">Nenhuma rota cadastrada.</td>
+                    </tr>
+                `;
+                routesStatusDiv.textContent = "Nenhuma rota cadastrada.";
+                routesStatusDiv.classList.add("empty");
+                return;
+            }
+
+            routesTableBody.innerHTML = routes.map((route) => `
+                <tr>
+                    <td>${escapeHtml(route.route_name || 'N/A')}</td>
+                    <td>${escapeHtml(route.vehicle_plate || 'N/A')}</td>
+                    <td>${escapeHtml(route.driver_name || 'N/A')}</td>
+                    <td>${escapeHtml(route.start_date?.split('T')[0] || 'N/A')}</td>
+                    <td>${escapeHtml(route.end_date?.split('T')[0] || 'N/A')}</td>
+                    <td>${escapeHtml(route.status || 'N/A')}</td>
+                    <td>
+                        <button
+                            type="button"
+                            class="btn btn-small btn-edit-route"
+                            data-route-id="${route.id}"
+                        >
+                            Editar
+                        </button>
+                        <!-- Adicione outros botões de ação aqui, se necessário -->
+                    </td>
+                </tr>
+            `).join("");
+            routesStatusDiv.textContent = ""; // Limpa o status de carregamento
+            routesStatusDiv.classList.remove("empty");
+        }
+
+        async function loadRoutes() {
+            const routesStatusDiv = document.getElementById("routes-status");
+            routesStatusDiv.textContent = "Carregando rotas...";
+            routesStatusDiv.classList.add("empty");
+
+            try {
+                const response = await fetch("/fleet/routes");
+
+                if (!response.ok) {
+                    throw new Error("Não foi possível carregar as rotas.");
+                }
+
+                const routes = await response.json();
+                renderRoutes(routes);
+            } catch (error) {
+                console.error("Erro ao carregar rotas:", error);
+                routesStatusDiv.textContent = `Erro: ${escapeHtml(error.message)}`;
+                routesTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7">${escapeHtml(error.message)}</td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Função para carregar veículos no select
+        async function loadVehiclesIntoSelect(selectElement) {
+            try {
+                const response = await fetch("/fleet/vehicles");
+                if (!response.ok) {
+                    throw new Error("Não foi possível carregar os veículos para o select.");
+                }
+                const vehicles = await response.json();
+
+                selectElement.innerHTML = '<option value="">Selecione um veículo</option>';
+                vehicles.forEach(vehicle => {
+                    const option = document.createElement("option");
+                    option.value = vehicle.id;
+                    option.textContent = `${vehicle.plate} - ${vehicle.brand} ${vehicle.model}`;
+                    selectElement.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Erro ao carregar veículos no select:", error);
+                selectElement.innerHTML = '<option value="">Erro ao carregar veículos</option>';
+            }
+        }
+
+        // Função para carregar motoristas no select
+        async function loadDriversIntoSelect(selectElement) {
+            try {
+                const response = await fetch("/fleet/drivers");
+                if (!response.ok) {
+                    throw new Error("Não foi possível carregar os motoristas para o select.");
+                }
+                const drivers = await response.json();
+
+                selectElement.innerHTML = '<option value="">Selecione um motorista</option>';
+                drivers.forEach(driver => {
+                    const option = document.createElement("option");
+                    option.value = driver.id;
+                    option.textContent = `${driver.name} (${driver.cpf})`;
+                    selectElement.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Erro ao carregar motoristas no select:", error);
+                selectElement.innerHTML = '<option value="">Erro ao carregar motoristas</option>';
+            }
+        }
+
+        // Listener para o formulário de cadastro de rotas
+        routeForm?.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const payload = {
+                route_name: document.getElementById("route_name").value.trim(),
+                vehicle_id: document.getElementById("route_vehicle_id").value || null,
+                driver_id: document.getElementById("route_driver_id").value || null,
+                start_date: document.getElementById("start_date").value,
+                end_date: document.getElementById("end_date").value || null,
+                status: document.getElementById("route_status").value,
+                description: document.getElementById("route_description").value.trim(),
+            };
+
+            try {
+                const response = await fetch("/fleet/routes", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || "Não foi possível cadastrar a rota.");
+                }
+
+                alert("Rota cadastrada com sucesso!");
+                routeForm.reset();
+                await loadRoutes();
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        // Listener para os botões de ação na tabela de rotas (Editar)
+        routesTableBody?.addEventListener("click", async (event) => {
+            const editButton = event.target.closest(".btn-edit-route");
+            try {
+                if (editButton) {
+                    const routeId = editButton.dataset.routeId;
+                    alert(`Editar rota ${routeId}`); // Aqui você abriria um modal de edição
+                }
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        // Carrega as rotas, veículos e motoristas ao iniciar a página
+        document.addEventListener("DOMContentLoaded", () => {
+            loadRoutes().catch((error) => {
+                console.error("Erro ao carregar rotas na inicialização:", error);
+                const routesStatusDiv = document.getElementById("routes-status");
+                if (routesStatusDiv) {
+                    routesStatusDiv.textContent = `Erro: ${escapeHtml(error.message)}`;
+                }
+                if (routesTableBody) {
+                    routesTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="7">${escapeHtml(error.message)}</td>
+                        </tr>
+                    `;
+                }
+            });
+            loadVehiclesIntoSelect(routeVehicleSelect);
+            loadDriversIntoSelect(routeDriverSelect);
+        });
+    </script>
+{% endblock %}

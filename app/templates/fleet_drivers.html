@@ -1,0 +1,495 @@
+{% extends "base.html" %}
+
+{% block title %}Motoristas da Frota - AtlasERP{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <div>
+            <h2>Motoristas da Frota</h2>
+            <p>Gerencie seus motoristas, habilitações e designações de veículos.</p>
+        </div>
+        <button id="reload-button" type="button">Atualizar</button>
+    </div>
+
+    <div id="message" class="message"></div>
+
+    <!-- Seção de Motoristas -->
+    <section class="panel">
+        <header class="card-header">
+            <h2>Motoristas</h2>
+            <button
+                type="button"
+                class="btn btn-primary"
+                id="new-driver-button"
+            >
+                Novo motorista
+            </button>
+        </header>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>CPF</th>
+                        <th>CNH</th>
+                        <th>Categoria</th>
+                        <th>Validade</th>
+                        <th>Status</th>
+                        <th>Veículo</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+
+                <tbody id="drivers-table-body">
+                    <tr>
+                        <td colspan="8">Carregando motoristas...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Modal de Motoristas -->
+    <div
+        class="modal"
+        id="driver-modal"
+        aria-hidden="true"
+    >
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="driver-modal-title">Novo motorista</h3>
+
+                <button
+                    type="button"
+                    class="modal-close"
+                    id="close-driver-modal"
+                    aria-label="Fechar"
+                >
+                    &times;
+                </button>
+            </div>
+
+            <form id="driver-form">
+                <input type="hidden" id="driver-id">
+
+                <div class="form-grid">
+                    <label>
+                        Nome
+                        <input
+                            type="text"
+                            id="driver-name"
+                            required
+                        >
+                    </label>
+
+                    <label>
+                        CPF
+                        <input
+                            type="text"
+                            id="driver-cpf"
+                            maxlength="14"
+                            required
+                        >
+                    </label>
+
+                    <label>
+                        Telefone
+                        <input
+                            type="text"
+                            id="driver-phone"
+                        >
+                    </label>
+
+                    <label>
+                        Número da CNH
+                        <input
+                            type="text"
+                            id="driver-license-number"
+                            required
+                        >
+                    </label>
+
+                    <label>
+                        Categoria
+                        <input
+                            type="text"
+                            id="driver-license-category"
+                            maxlength="5"
+                            required
+                        >
+                    </label>
+
+                    <label>
+                        Validade da CNH
+                        <input
+                            type="date"
+                            id="driver-license-expiry"
+                            required
+                        >
+                    </label>
+
+                    <label>
+                        Status
+                        <select id="driver-status">
+                            <option value="ACTIVE">Ativo</option>
+                            <option value="SUSPENDED">Suspenso</option>
+                            <option value="INACTIVE">Inativo</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        Veículo
+                        <select id="driver-vehicle-id">
+                            <option value="">Sem veículo</option>
+                        </select>
+                    </label>
+
+                    <label class="form-field-full">
+                        Observações
+                        <textarea id="driver-notes"></textarea>
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        id="cancel-driver-form"
+                    >
+                        Cancelar
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                    >
+                        Salvar motorista
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        // Variáveis globais para os elementos da tabela e modal de motoristas
+        const driversTableBody = document.getElementById("drivers-table-body");
+        const driverModal = document.getElementById("driver-modal");
+        const driverForm = document.getElementById("driver-form");
+        const newDriverButton = document.getElementById("new-driver-button");
+        const closeDriverModalButton = document.getElementById("close-driver-modal");
+        const cancelDriverFormButton = document.getElementById("cancel-driver-form");
+        const driverVehicleSelect = document.getElementById("driver-vehicle-id"); // Select de veículos no formulário do motorista
+
+        // Função auxiliar para escapar HTML e prevenir XSS
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replaceAll("&", "&")
+                .replaceAll("<", "<")
+                .replaceAll(">", ">")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        // Função para abrir o modal de motoristas, preenchendo com dados se for edição
+        async function openDriverModal(driver = null) {
+            driverForm.reset(); // Limpa o formulário
+
+            // Preenche o select de veículos
+            await loadVehiclesIntoSelect(driverVehicleSelect);
+
+            // Preenche os campos do formulário com os dados do motorista ou valores vazios
+            document.getElementById("driver-id").value = driver?.id || "";
+            document.getElementById("driver-name").value = driver?.name || "";
+            document.getElementById("driver-cpf").value = driver?.cpf || "";
+            document.getElementById("driver-phone").value = driver?.phone || "";
+            document.getElementById("driver-license-number").value =
+                driver?.license_number || "";
+            document.getElementById("driver-license-category").value =
+                driver?.license_category || "";
+            document.getElementById("driver-license-expiry").value =
+                driver?.license_expiry || "";
+            document.getElementById("driver-status").value =
+                driver?.status || "ACTIVE";
+            document.getElementById("driver-vehicle-id").value =
+                driver?.vehicle_id || "";
+            document.getElementById("driver-notes").value =
+                driver?.notes || "";
+
+            // Atualiza o título do modal
+            document.getElementById("driver-modal-title").textContent =
+                driver ? "Editar motorista" : "Novo motorista";
+
+            // Exibe o modal
+            driverModal.setAttribute("aria-hidden", "false");
+            driverModal.classList.add("is-open");
+        }
+
+        // Função para fechar o modal de motoristas
+        function closeDriverModal() {
+            driverModal.setAttribute("aria-hidden", "true");
+            driverModal.classList.remove("is-open");
+        }
+
+        // Função para renderizar a lista de motoristas na tabela
+        function renderDrivers(drivers) {
+            if (!drivers.length) {
+                driversTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="8">Nenhum motorista cadastrado.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            driversTableBody.innerHTML = drivers.map((driver) => `
+                <tr>
+                    <td>${escapeHtml(driver.name)}</td>
+                    <td>${escapeHtml(driver.cpf)}</td>
+                    <td>${escapeHtml(driver.license_number)}</td>
+                    <td>${escapeHtml(driver.license_category)}</td>
+                    <td>${escapeHtml(driver.license_expiry)}</td>
+                    <td>${escapeHtml(driver.status)}</td>
+                    <td>${escapeHtml(driver.vehicle_plate || "—")}</td>
+                    <td>
+                        <button
+                            type="button"
+                            class="btn btn-small btn-edit-driver"
+                            data-driver-id="${driver.id}"
+                        >
+                            Editar
+                        </button>
+                        ${driver.status === 'INACTIVE' ? `
+                        <button
+                            type="button"
+                            class="btn btn-small btn-activate-driver"
+                            data-driver-id="${driver.id}"
+                        >
+                            Ativar
+                        </button>
+                        ` : `
+                        <button
+                            type="button"
+                            class="btn btn-small btn-deactivate-driver"
+                            data-driver-id="${driver.id}"
+                        >
+                            Desativar
+                        </button>
+                        `}
+                    </td>
+                </tr>
+            `).join("");
+        }
+
+        // Função assíncrona para carregar motoristas da API
+        async function loadDrivers() {
+            const driversTableBody = document.getElementById("drivers-table-body");
+            driversTableBody.innerHTML = `
+                <tr>
+                    <td colspan="8">Carregando motoristas...</td>
+                </tr>
+            `;
+            try {
+                const response = await fetch("/fleet/drivers");
+
+                if (!response.ok) {
+                    throw new Error("Não foi possível carregar os motoristas.");
+                }
+
+                const drivers = await response.json();
+                renderDrivers(drivers);
+            } catch (error) {
+                console.error("Erro ao carregar motoristas:", error);
+                driversTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="8">${escapeHtml(error.message)}</td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Função assíncrona para carregar um motorista específico para edição
+        async function loadDriverForEdit(driverId) {
+            const response = await fetch(`/fleet/drivers/${driverId}`);
+
+            if (!response.ok) {
+                throw new Error("Motorista não encontrado.");
+            }
+
+            const driver = await response.json();
+            openDriverModal(driver);
+        }
+
+        // Função assíncrona para salvar (criar ou atualizar) um motorista
+        async function saveDriver(event) {
+            event.preventDefault(); // Previne o comportamento padrão do formulário
+
+            const driverId = document.getElementById("driver-id").value;
+
+            // Monta o payload com os dados do formulário
+            const payload = {
+                name: document.getElementById("driver-name").value.trim(),
+                cpf: document.getElementById("driver-cpf").value.trim(),
+                phone: document.getElementById("driver-phone").value.trim(),
+                license_number: document
+                    .getElementById("driver-license-number")
+                    .value
+                    .trim(),
+                license_category: document
+                    .getElementById("driver-license-category")
+                    .value
+                    .trim()
+                    .toUpperCase(),
+                license_expiry: document
+                    .getElementById("driver-license-expiry")
+                    .value,
+                status: document.getElementById("driver-status").value,
+                vehicle_id: document.getElementById("driver-vehicle-id").value || null,
+                notes: document.getElementById("driver-notes").value.trim(),
+            };
+
+            // Define a URL e o método HTTP (POST para novo, PUT para atualização)
+            const url = driverId
+                ? `/fleet/drivers/${driverId}`
+                : "/fleet/drivers";
+
+            const method = driverId ? "PUT" : "POST";
+
+            // Envia a requisição para a API
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || "Não foi possível salvar.");
+            }
+
+            closeDriverModal(); // Fecha o modal
+            await loadDrivers(); // Recarrega a lista de motoristas
+        }
+
+        // Função assíncrona para desativar um motorista
+        async function deactivateDriver(driverId) {
+            const confirmed = window.confirm(
+                "Deseja realmente desativar este motorista?"
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            const response = await fetch(`/fleet/drivers/${driverId}`, {
+                method: "DELETE",
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || "Não foi possível desativar.");
+            }
+
+            await loadDrivers(); // Recarrega a lista de motoristas
+        }
+        async function activateDriver(driverId) {
+            const confirmed = window.confirm(
+                "Deseja realmente ativar este motorista?"
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            const response = await fetch(`/fleet/drivers/${driverId}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ status: "ACTIVE" }), // Envia o status para ACTIVE
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || "Não foi possível ativar.");
+            }
+
+            await loadDrivers(); // Recarrega a lista de motoristas
+        }
+
+        // Função para carregar veículos no select do formulário do motorista
+        async function loadVehiclesIntoSelect(selectElement) {
+            try {
+                const response = await fetch("/fleet/vehicles");
+                if (!response.ok) {
+                    throw new Error("Não foi possível carregar os veículos para o select.");
+                }
+                const vehicles = await response.json();
+
+                selectElement.innerHTML = '<option value="">Sem veículo</option>'; // Opção padrão
+                vehicles.forEach(vehicle => {
+                    const option = document.createElement("option");
+                    option.value = vehicle.id;
+                    option.textContent = `${vehicle.plate} - ${vehicle.brand} ${vehicle.model}`;
+                    selectElement.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Erro ao carregar veículos no select:", error);
+                selectElement.innerHTML = '<option value="">Erro ao carregar veículos</option>';
+            }
+        }
+
+        // Adiciona listeners de eventos
+        newDriverButton?.addEventListener("click", () => {
+            openDriverModal();
+        });
+
+        closeDriverModalButton?.addEventListener("click", closeDriverModal);
+        cancelDriverFormButton?.addEventListener("click", closeDriverModal);
+        driverForm?.addEventListener("submit", saveDriver);
+
+        driversTableBody?.addEventListener("click", async (event) => {
+            const editButton = event.target.closest(".btn-edit-driver");
+            const deactivateButton = event.target.closest(".btn-deactivate-driver");
+            const activateButton = event.target.closest(".btn-activate-driver"); // Novo botão
+
+            try {
+                if (editButton) {
+                    await loadDriverForEdit(editButton.dataset.driverId);
+                } else if (deactivateButton) { // Use else if para evitar conflitos
+                    await deactivateDriver(
+                        deactivateButton.dataset.driverId
+                    );
+                } else if (activateButton) { // Novo bloco para o botão Ativar
+                    await activateDriver(
+                        activateButton.dataset.driverId
+                    );
+                }
+            } catch (error) {
+                window.alert(error.message);
+            }
+        });
+
+        // Carrega os motoristas ao iniciar a página
+        document.addEventListener("DOMContentLoaded", () => {
+            loadDrivers().catch((error) => {
+                console.error("Erro ao carregar motoristas na inicialização:", error);
+                if (driversTableBody) {
+                    driversTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="8">${escapeHtml(error.message)}</td>
+                        </tr>
+                    `;
+                }
+            });
+        });
+    </script>
+{% endblock %}

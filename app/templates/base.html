@@ -3,311 +3,64 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}AtlasERP{% endblock %}</title>
+    <title>{% block title %}AtlasERP - Gestão Integrada{% endblock %}</title>
 
-    <style>
-        :root {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            color: #1f2937;
-        }
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-        }
-
-        header {
-            background: #172554;
-            color: white;
-            padding: 20px 32px;
-        }
-
-        header h1 {
-            margin: 0 0 4px;
-        }
-
-        header p {
-            margin: 0;
-            color: #c7d2fe;
-        }
-
-        nav {
-            background: #1e3a8a;
-            padding: 0 32px;
-            display: flex;
-            gap: 4px;
-            flex-wrap: wrap;
-        }
-
-        nav a {
-            color: #dbeafe;
-            text-decoration: none;
-            padding: 13px 15px;
-        }
-
-        nav a:hover,
-        nav a.active {
-            background: #2563eb;
-            color: white;
-        }
-
-        main {
-            max-width: 1200px;
-            margin: 32px auto;
-            padding: 0 20px;
-        }
-
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .page-header h2 {
-            margin: 0;
-        }
-
-        .panel {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgb(15 23 42 / 8%);
-            margin-bottom: 24px;
-        }
-
-        .cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgb(15 23 42 / 8%);
-        }
-
-        .card h3 {
-            margin: 0 0 8px;
-            font-size: 15px;
-            color: #64748b;
-        }
-
-        .number {
-            font-size: 32px;
-            font-weight: bold;
-            color: #172554;
-        }
-
-        form {
-            display: grid;
-            gap: 12px;
-        }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-            gap: 14px;
-        }
-
-        label {
-            display: grid;
-            gap: 5px;
-            font-weight: bold;
-            font-size: 14px;
-        }
-
-        input,
-        select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #cbd5e1;
-            border-radius: 7px;
-            font-size: 14px;
-        }
-
-        button {
-            border: 0;
-            border-radius: 7px;
-            padding: 10px 14px;
-            background: #2563eb;
-            color: white;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        button:hover {
-            background: #1d4ed8;
-        }
-
-        button:disabled {
-        opacity: 0.65;
-        cursor: wait;
-        }
-
-        button.secondary {
-        background: #64748b;
-        transition: background 0.2s ease, transform 0.1s ease;
-        }
-
-        button.secondary:hover {
-        background: #475569;
-        transform: translateY(-1px);
-        }
-
-        button.secondary:active {
-        transform: translateY(0);
-        }
-
-        button.danger {
-            background: #dc2626;
-        }
-
-        button.danger:hover {
-            background: #b91c1c;
-        }
-
-        .actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .message {
-            display: none;
-            margin-bottom: 18px;
-            padding: 12px;
-            border-radius: 7px;
-        }
-
-        .message.success {
-            display: block;
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .message.error {
-            display: block;
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .table-wrapper {
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th,
-        td {
-            text-align: left;
-            padding: 12px 8px;
-            border-bottom: 1px solid #e5e7eb;
-            vertical-align: middle;
-        }
-
-        th {
-            color: #64748b;
-            font-size: 13px;
-        }
-
-        .status {
-            display: inline-block;
-            padding: 4px 9px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .active {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .inactive {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .empty {
-            color: #64748b;
-            padding: 20px 0;
-        }
-
-        @media (max-width: 700px) {
-            header,
-            nav {
-                padding-left: 18px;
-                padding-right: 18px;
-            }
-
-            .page-header {
-                align-items: flex-start;
-                flex-direction: column;
-            }
-            .alerts-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                gap: 1rem;
-            }
-
-            .alert-card {
-                padding: 1rem;
-                border: 1px solid #cbd5e1;
-                border-radius: 10px;
-                background: #f8fafc;
-            }
-
-            .alert-card h3 {
-                margin-top: 0;
-            }
-
-            .alert-card.danger {
-                border-color: #ef4444;
-                background: #fef2f2;
-            } 
-
-            .alert-card.warning {
-                border-color: #f59e0b;
-                background: #fffbeb;
-            }
-
-            .alert-card ul {
-                padding-left: 1.2rem;
-            }
-        }
-    </style>
+    <!-- CSS Global -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <header>
-        <h1>AtlasERP</h1>
-        <p>Gest├úo de produtos, estoque e opera├º├Áes</p>
+    <!-- Top Header Branding -->
+    <header class="brand-header">
+        <div class="brand-container">
+            <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="Logo AtlasERP" class="brand-logo">
+            <div class="brand-info">
+                <h1>AtlasERP</h1>
+                <p>Sistema Integrado de Gestão Empresarial</p>
+            </div>
+        </div>
+        <div class="brand-badge">
+            Powered by <strong>NandaTech</strong>
+        </div>
     </header>
 
-    <nav>
-        <a href="/dashboard">Dashboard</a>
-        <a href="/ui/products">Produtos</a>
-        <a href="/ui/customers">Clientes</a>
-        <a href="/ui/suppliers">Fornecedores</a>
-        <a href="/ui/purchases">Compras</a>
-        <a href="/ui/sales">Vendas</a>
-        <a href="/ui/fleet">Frota</a>
+    <!-- Main Navigation Bar -->
+    <nav class="main-nav">
+        <ul>
+            <li><a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}">📊 Dashboard</a></li>
+            <li><a href="/ui/products" class="{% if request.path == '/ui/products' %}active{% endif %}">📦 Produtos</a></li>
+            <li><a href="/ui/customers" class="{% if request.path == '/ui/customers' %}active{% endif %}">👥 Clientes</a></li>
+            <li><a href="/ui/suppliers" class="{% if request.path == '/ui/suppliers' %}active{% endif %}">🏢 Fornecedores</a></li>
+            <li><a href="/ui/sales" class="{% if request.path == '/ui/sales' %}active{% endif %}">🛒 Vendas</a></li>
+            <li><a href="/ui/purchases" class="{% if request.path == '/ui/purchases' %}active{% endif %}">📋 Compras</a></li>
+            
+            <li class="dropdown">
+                <a href="/ui/fleet" class="{% if '/ui/fleet' in request.path %}active{% endif %}">🚚 Frota ▾</a>
+                <div class="dropdown-content">
+                    <a href="/ui/fleet">Painel da Frota</a>
+                    <a href="/ui/fleet/vehicles">Veículos</a>
+                    <a href="/ui/fleet/maintenances">Manutenções</a>
+                    <a href="/ui/fleet/drivers">Motoristas</a>
+                    <a href="/ui/fleet/routes">Rotas</a>
+                </div>
+            </li>
+        </ul>
     </nav>
 
+    <!-- Main Content Body -->
     <main>
         {% block content %}{% endblock %}
     </main>
+
+    <!-- App Footer -->
+    <footer class="app-footer">
+        <p>AtlasERP &copy; 2026 • Produzido com ❤️ por <span class="nanda-signature">NandaTech</span></p>
+    </footer>
+
+    {% block scripts %}{% endblock %}
 </body>
 </html>
-'@ | Set-Content app\templates\base.html -Encoding utf8

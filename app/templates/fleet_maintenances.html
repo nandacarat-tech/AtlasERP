@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+
+{% block title %}Manutenções da Frota - AtlasERP{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <div>
+            <h2>Manutenções da Frota</h2>
+            <p>Acompanhe o histórico e agende manutenções para seus veículos.</p>
+        </div>
+        <button id="reload-button" type="button">Atualizar</button>
+    </div>
+
+    <div id="message" class="message"></div>
+
+    <!-- Seção de Manutenções -->
+    <section class="panel">
+        <header class="card-header">
+            <h2>Manutenções</h2>
+            <button
+                type="button"
+                class="btn btn-primary"
+                id="new-maintenance-button"
+            >
+                Nova Manutenção
+            </button>
+        </header>
+
+        <form id="maintenance-filter">
+            <label>
+                Veículo
+                <select id="maintenance-vehicle">
+                    <option value="">Todos os veículos</option>
+                </select>
+            </label>
+
+            <button type="submit">Carregar manutenções</button>
+        </form>
+
+        <div id="maintenance-status" class="empty">Carregando manutenções...</div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Veículo</th>
+                        <th>Descrição</th>
+                        <th>Tipo</th>
+                        <th>Oficina</th>
+                        <th>Abertura</th>
+                        <th>Quilometragem</th>
+                        <th>Custo</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="maintenances-table-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Modal de Manutenção -->
+    <div
+        id="maintenance-modal"
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden="true"
+    >
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="maintenance-modal-title">Nova Manutenção</h2>
+                <button
+                    type="button"
+                    class="close-button"
+                    id="close-maintenance-modal"
+                    aria-label="Fechar"
+                >
+                    &times;
+                </button>
+            </div>
+            <form id="maintenance-form">
+                <input type="hidden" id="maintenance-id" />
+
+                <div class="form-group">
+                    <label for="maintenance-vehicle-id">Veículo</label>
+                    <select id="maintenance-vehicle-id" required>
+                        <!-- Opções de veículos serão carregadas via JS -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="maintenance-type">Tipo de Manutenção</label>
+                    <input
+                        type="text"
+                        id="maintenance-type"
+                        placeholder="Ex: Preventiva, Corretiva"
+                        required
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="maintenance-description">Descrição</label>
+                    <textarea
+                        id="maintenance-description"
+                        rows="3"
+                        placeholder="Detalhes da manutenção"
+                        required
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="maintenance-workshop">Oficina</label>
+                    <input
+                        type="text"
+                        id="maintenance-workshop"
+                        placeholder="Nome da oficina"
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="maintenance-scheduled-at">Data Agendada</label>
+                    <input type="date" id="maintenance-scheduled-at" />
+                </div>
+
+                <div class="form-group">
+                    <label for="maintenance-completed-at">Data Concluída</label>
+                    <input type="date" id="maintenance-completed-at" />
+                </div>
+
+                <div class="form-group">
+                    <label for="maintenance-mileage">Quilometragem</label>
+                    <input
+                        type="number"
+                        id="maintenance-mileage"
+                        placeholder="Quilometragem no momento da manutenção"
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="maintenance-cost">Custo</label>
+                    <input
+                        type="number"
+                        id="maintenance-cost"
+                        step="0.01"
+                        placeholder="Custo total da manutenção"
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="maintenance-status">Status</label>
+                    <select id="maintenance-status" required>
+                        <option value="OPEN">Aberta</option>
+                        <option value="SCHEDULED">Agendada</option>
+                        <option value="IN_PROGRESS">Em Progresso</option>
+                        <option value="COMPLETED">Concluída</option>
+                        <option value="CANCELLED">Cancelada</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="maintenance-next-maintenance-at"
+                        >Próxima Manutenção</label
+                    >
+                    <input type="date" id="maintenance-next-maintenance-at" />
+                </div>
+
+                <div class="form-group">
+                    <label for="maintenance-notes">Observações</label>
+                    <textarea
+                        id="maintenance-notes"
+                        rows="3"
+                        placeholder="Observações adicionais"
+                    ></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button
+                        type="button"
+                        class="btn btn-secondary"
+                        id="cancel-maintenance-form"
+                    >
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        Salvar Manutenção
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        // Variáveis globais para os elementos da tabela e modal de manutenções
+        const maintenancesTableBody = document.getElementById("maintenances-table-body");
+        const maintenanceModal = document.getElementById("maintenance-modal");
+        const maintenanceForm = document.getElementById("maintenance-form");
+        const newMaintenanceButton = document.getElementById("new-maintenance-button");
+        const closeMaintenanceModalButton = document.getElementById("close-maintenance-modal");
+        const cancelMaintenanceFormButton = document.getElementById("cancel-maintenance-form");
+        const maintenanceVehicleSelect = document.getElementById("maintenance-vehicle-id");
+        const maintenanceFilterVehicleSelect = document.getElementById("maintenance-vehicle"); // Select do filtro
+
+        // Função auxiliar para escapar HTML e prevenir XSS
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replaceAll("&", "&")
+                .replaceAll("<", "<")
+                .replaceAll(">", ">")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        // Funções para Manutenções
+        function renderMaintenances(maintenances) {
+            const maintenanceStatusDiv = document.getElementById("maintenance-status");
+            if (!maintenances.length) {
+                maintenancesTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="9">Nenhuma manutenção registrada.</td>
+                    </tr>
+                `;
+                maintenanceStatusDiv.textContent = "Nenhuma manutenção registrada.";
+                maintenanceStatusDiv.classList.add("empty");
+                return;
+            }
+
+            maintenancesTableBody.innerHTML = maintenances.map((maintenance) => `
+                <tr>
+                    <td>${escapeHtml(maintenance.vehicle_plate || 'N/A')}</td>
+                    <td>${escapeHtml(maintenance.description)}</td>
+                    <td>${escapeHtml(maintenance.maintenance_type || 'N/A')}</td>
+                    <td>${escapeHtml(maintenance.workshop || 'N/A')}</td>
+                    <td>${escapeHtml(maintenance.scheduled_at?.split('T')[0] || 'N/A')}</td>
+                    <td>${escapeHtml(maintenance.mileage || 'N/A')}</td>
+                    <td>${escapeHtml(maintenance.cost || 'N/A')}</td>
+                    <td>${escapeHtml(maintenance.status || 'N/A')}</td>
+                    <td>
+                        <!-- Adicione aqui os botões de ação para manutenções, se houver -->
+                        <button
+                            type="button"
+                            class="btn btn-small btn-edit-maintenance"
+                            data-maintenance-id="${maintenance.id}"
+                        >
+                            Editar
+                        </button>
+                    </td>
+                </tr>
+            `).join("");
+            maintenanceStatusDiv.textContent = ""; // Limpa o status de carregamento
+            maintenanceStatusDiv.classList.remove("empty");
+        }
+
+        async function loadMaintenances(vehicleId = null) {
+            const maintenanceStatusDiv = document.getElementById("maintenance-status");
+            maintenanceStatusDiv.textContent = "Carregando manutenções...";
+            maintenanceStatusDiv.classList.add("empty");
+
+            try {
+                const url = vehicleId ? `/fleet/maintenances?vehicle_id=${vehicleId}` : "/fleet/maintenances";
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error("Não foi possível carregar as manutenções.");
+                }
+
+                const maintenances = await response.json();
+                renderMaintenances(maintenances);
+            } catch (error) {
+                console.error("Erro ao carregar manutenções:", error);
+                maintenanceStatusDiv.textContent = `Erro: ${escapeHtml(error.message)}`;
+                maintenancesTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="9">${escapeHtml(error.message)}</td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Função para abrir o modal de manutenções, preenchendo com dados se for edição
+        async function openMaintenanceModal(maintenance = null) {
+            maintenanceForm.reset(); // Limpa o formulário
+
+            // Preenche o select de veículos
+            await loadVehiclesIntoSelect(maintenanceVehicleSelect);
+
+            // Preenche os campos do formulário com os dados da manutenção ou valores vazios
+            document.getElementById("maintenance-id").value = maintenance?.id || "";
+            document.getElementById("maintenance-vehicle-id").value = maintenance?.vehicle_id || "";
+            document.getElementById("maintenance-type").value = maintenance?.maintenance_type || "";
+            document.getElementById("maintenance-description").value = maintenance?.description || "";
+            document.getElementById("maintenance-workshop").value = maintenance?.workshop || "";
+            document.getElementById("maintenance-scheduled-at").value = maintenance?.scheduled_at?.split('T')[0] || ""; // Formato YYYY-MM-DD
+            document.getElementById("maintenance-completed-at").value = maintenance?.completed_at?.split('T')[0] || ""; // Formato YYYY-MM-DD
+            document.getElementById("maintenance-mileage").value = maintenance?.mileage || "";
+            document.getElementById("maintenance-cost").value = maintenance?.cost || "";
+            document.getElementById("maintenance-status").value = maintenance?.status || "OPEN";
+            document.getElementById("maintenance-next-maintenance-at").value = maintenance?.next_maintenance_at?.split('T')[0] || ""; // Formato YYYY-MM-DD
+            document.getElementById("maintenance-notes").value = maintenance?.notes || "";
+
+            // Atualiza o título do modal
+            document.getElementById("maintenance-modal-title").textContent =
+                maintenance ? "Editar Manutenção" : "Nova Manutenção";
+
+            // Exibe o modal
+            maintenanceModal.setAttribute("aria-hidden", "false");
+            maintenanceModal.classList.add("is-open");
+        }
+
+        // Função para fechar o modal de manutenções
+        function closeMaintenanceModal() {
+            maintenanceModal.setAttribute("aria-hidden", "true");
+            maintenanceModal.classList.remove("is-open");
+        }
+
+        // Função para carregar veículos no select do formulário de manutenção e filtro
+        async function loadVehiclesIntoSelect(selectElement) {
+            try {
+                const response = await fetch("/fleet/vehicles");
+                if (!response.ok) {
+                    throw new Error("Não foi possível carregar os veículos para o select.");
+                }
+                const vehicles = await response.json();
+
+                selectElement.innerHTML = '<option value="">Selecione um veículo</option>'; // Opção padrão
+                vehicles.forEach(vehicle => {
+                    const option = document.createElement("option");
+                    option.value = vehicle.id;
+                    option.textContent = `${vehicle.plate} - ${vehicle.brand} ${vehicle.model}`;
+                    selectElement.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Erro ao carregar veículos no select:", error);
+                selectElement.innerHTML = '<option value="">Erro ao carregar veículos</option>';
+            }
+        }
+
+        // Função assíncrona para salvar (criar ou atualizar) uma manutenção
+        async function saveMaintenance(event) {
+            event.preventDefault(); // Previne o comportamento padrão do formulário
+
+            const maintenanceId = document.getElementById("maintenance-id").value;
+
+            // Monta o payload com os dados do formulário
+            const payload = {
+                vehicle_id: document.getElementById("maintenance-vehicle-id").value,
+                maintenance_type: document.getElementById("maintenance-type").value.trim(),
+                description: document.getElementById("maintenance-description").value.trim(),
+                workshop: document.getElementById("maintenance-workshop").value.trim(),
+                scheduled_at: document.getElementById("maintenance-scheduled-at").value,
+                completed_at: document.getElementById("maintenance-completed-at").value,
+                mileage: document.getElementById("maintenance-mileage").value,
+                cost: document.getElementById("maintenance-cost").value,
+                status: document.getElementById("maintenance-status").value,
+                next_maintenance_at: document.getElementById("maintenance-next-maintenance-at").value,
+                notes: document.getElementById("maintenance-notes").value.trim(),
+            };
+
+            // Define a URL e o método HTTP (POST para novo, PUT para atualização)
+            const url = maintenanceId
+                ? `/fleet/maintenances/${maintenanceId}`
+                : "/fleet/maintenances";
+
+            const method = maintenanceId ? "PUT" : "POST";
+
+            // Envia a requisição para a API
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || "Não foi possível salvar a manutenção.");
+            }
+
+            closeMaintenanceModal(); // Fecha o modal
+            await loadMaintenances(); // Recarrega a lista de manutenções
+        }
+
+        // Função assíncrona para carregar uma manutenção específica para edição
+        async function loadMaintenanceForEdit(maintenanceId) {
+            const response = await fetch(`/fleet/maintenances/${maintenanceId}`);
+
+            if (!response.ok) {
+                throw new Error("Manutenção não encontrada.");
+            }
+
+            const maintenance = await response.json();
+            openMaintenanceModal(maintenance);
+        }
+
+        // Adicionar listeners de eventos para o modal de manutenção
+        newMaintenanceButton?.addEventListener("click", () => {
+            openMaintenanceModal();
+        });
+
+        closeMaintenanceModalButton?.addEventListener("click", closeMaintenanceModal);
+        cancelMaintenanceFormButton?.addEventListener("click", closeMaintenanceModal);
+        maintenanceForm?.addEventListener("submit", saveMaintenance);
+
+        maintenancesTableBody?.addEventListener("click", async (event) => {
+            const editButton = event.target.closest(".btn-edit-maintenance");
+            // Adicione outros botões de ação aqui, se houver (ex: deletar)
+
+            try {
+                if (editButton) {
+                    await loadMaintenanceForEdit(editButton.dataset.maintenanceId);
+                }
+            } catch (error) {
+                window.alert(error.message);
+            }
+        });
+
+        // Listener para o formulário de filtro de manutenções
+        document.getElementById("maintenance-filter")?.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const selectedVehicleId = maintenanceFilterVehicleSelect.value;
+            loadMaintenances(selectedVehicleId);
+        });
+
+
+        // Carrega as manutenções e os veículos para o filtro ao iniciar a página
+        document.addEventListener("DOMContentLoaded", () => {
+            loadMaintenances().catch((error) => {
+                console.error("Erro ao carregar manutenções na inicialização:", error);
+                const maintenanceStatusDiv = document.getElementById("maintenance-status");
+                if (maintenanceStatusDiv) {
+                    maintenanceStatusDiv.textContent = `Erro: ${escapeHtml(error.message)}`;
+                }
+                if (maintenancesTableBody) {
+                    maintenancesTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="9">${escapeHtml(error.message)}</td>
+                        </tr>
+                    `;
+                }
+            });
+            loadVehiclesIntoSelect(maintenanceFilterVehicleSelect); // Carrega veículos para o filtro
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}Veículos da Frota - AtlasERP{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <div>
+            <h2>Veículos da Frota</h2>
+            <p>Gerencie todos os veículos da sua frota.</p>
+        </div>
+        <button id="reload-button" type="button">Atualizar</button>
+    </div>
+
+    <div id="message" class="message"></div>
+
+    <!-- Seção de Novo Veículo -->
+    <section class="panel">
+        <h3>Novo veículo</h3>
+
+        <form id="vehicle-form">
+            <div class="form-grid">
+                <label>
+                    Placa
+                    <input id="plate" required>
+                </label>
+
+                <label>
+                    Tipo
+                    <input id="vehicle_type" required>
+                </label>
+
+                <label>
+                    Marca
+                    <input id="brand">
+                </label>
+
+                <label>
+                    Modelo
+                    <input id="model">
+                </label>
+
+                <label>
+                    Ano de fabricação
+                    <input id="manufacture_year" type="number" min="1900">
+                </label>
+
+                <label>
+                    Capacidade (kg)
+                    <input id="capacity_kg" type="number" min="0" step="0.01">
+                </label>
+
+                <label>
+                    Quilometragem atual
+                    <input id="current_mileage" type="number" min="0" value="0">
+                </label>
+
+                <label>
+                    Status
+                    <select id="status">
+                        <option value="AVAILABLE">Disponível</option>
+                        <option value="IN_USE">Em uso</option>
+                        <option value="MAINTENANCE">Manutenção</option>
+                        <option value="INACTIVE">Inativo</option>
+                    </select>
+                </label>
+            </div>
+
+            <label>
+                Observações
+                <input id="notes">
+            </label>
+
+            <button type="submit">Cadastrar veículo</button>
+        </form>
+    </section>
+
+    <!-- Seção de Veículos Cadastrados -->
+    <section class="panel">
+        <h3>Veículos cadastrados</h3>
+
+        <div id="vehicle-status" class="empty">Carregando veículos...</div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Placa</th>
+                        <th>Tipo</th>
+                        <th>Marca</th>
+                        <th>Modelo</th>
+                        <th>Ano</th>
+                        <th>Capacidade</th>
+                        <th>Quilometragem</th>
+                        <th>Status</th>
+                        <th>Observações</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="vehicles-table-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Se você tiver um modal de edição de veículos, ele também viria aqui -->
+
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        // Variáveis globais para os elementos da tabela de veículos
+        const vehiclesTableBody = document.getElementById("vehicles-table-body");
+        const vehicleForm = document.getElementById("vehicle-form");
+
+        // Função auxiliar para escapar HTML e prevenir XSS
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replaceAll("&", "&")
+                .replaceAll("<", "<")
+                .replaceAll(">", ">")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        // Funções para Veículos
+        function renderVehicles(vehicles) {
+            const vehicleStatusDiv = document.getElementById("vehicle-status");
+            if (!vehicles.length) {
+                vehiclesTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="10">Nenhum veículo cadastrado.</td>
+                    </tr>
+                `;
+                vehicleStatusDiv.textContent = "Nenhum veículo cadastrado.";
+                vehicleStatusDiv.classList.add("empty");
+                return;
+            }
+
+            vehiclesTableBody.innerHTML = vehicles.map((vehicle) => `
+                <tr>
+                    <td>${escapeHtml(vehicle.plate || 'N/A')}</td>
+                    <td>${escapeHtml(vehicle.vehicle_type || 'N/A')}</td>
+                    <td>${escapeHtml(vehicle.brand || 'N/A')}</td>
+                    <td>${escapeHtml(vehicle.model || 'N/A')}</td>
+                    <td>${escapeHtml(vehicle.manufacture_year || 'N/A')}</td>
+                    <td>${escapeHtml(vehicle.capacity_kg || 'N/A')}</td>
+                    <td>${escapeHtml(vehicle.current_mileage || 'N/A')}</td>
+                    <td>${escapeHtml(vehicle.status || 'N/A')}</td>
+                    <td>${escapeHtml(vehicle.notes || 'N/A')}</td>
+                    <td>
+                        <button
+                            type="button"
+                            class="btn btn-small btn-edit-vehicle"
+                            data-vehicle-id="${vehicle.id}"
+                        >
+                            Editar
+                        </button>
+                        ${vehicle.status === 'INACTIVE' ? `
+                        <button
+                            type="button"
+                            class="btn btn-small btn-activate-vehicle"
+                            data-vehicle-id="${vehicle.id}"
+                        >
+                            Ativar
+                        </button>
+                        ` : `
+                        <button
+                            type="button"
+                            class="btn btn-small btn-deactivate-vehicle"
+                            data-vehicle-id="${vehicle.id}"
+                        >
+                            Desativar
+                        </button>
+                        `}
+                    </td>
+                </tr>
+            `).join("");
+            vehicleStatusDiv.textContent = ""; // Limpa o status de carregamento
+            vehicleStatusDiv.classList.remove("empty");
+        }
+
+        async function loadVehicles() {
+            const vehicleStatusDiv = document.getElementById("vehicle-status");
+            vehicleStatusDiv.textContent = "Carregando veículos...";
+            vehicleStatusDiv.classList.add("empty");
+
+            try {
+                const response = await fetch("/fleet/vehicles");
+
+                if (!response.ok) {
+                    throw new Error("Não foi possível carregar os veículos.");
+                }
+
+                const vehicles = await response.json();
+                renderVehicles(vehicles);
+            } catch (error) {
+                console.error("Erro ao carregar veículos:", error);
+                vehicleStatusDiv.textContent = `Erro: ${escapeHtml(error.message)}`;
+                vehiclesTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="10">${escapeHtml(error.message)}</td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Listener para o formulário de cadastro de veículos
+        vehicleForm?.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const payload = {
+                plate: document.getElementById("plate").value.trim(),
+                vehicle_type: document.getElementById("vehicle_type").value.trim(),
+                brand: document.getElementById("brand").value.trim(),
+                model: document.getElementById("model").value.trim(),
+                manufacture_year: parseInt(document.getElementById("manufacture_year").value),
+                capacity_kg: parseFloat(document.getElementById("capacity_kg").value),
+                current_mileage: parseInt(document.getElementById("current_mileage").value),
+                status: document.getElementById("status").value,
+                notes: document.getElementById("notes").value.trim(),
+            };
+
+            try {
+                const response = await fetch("/fleet/vehicles", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || "Não foi possível cadastrar o veículo.");
+                }
+
+                alert("Veículo cadastrado com sucesso!");
+                vehicleForm.reset();
+                await loadVehicles();
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        // Listener para os botões de ação na tabela de veículos (Editar/Ativar/Desativar)
+        vehiclesTableBody?.addEventListener("click", async (event) => {
+            const editButton = event.target.closest(".btn-edit-vehicle");
+            const deactivateButton = event.target.closest(".btn-deactivate-vehicle");
+            const activateButton = event.target.closest(".btn-activate-vehicle");
+
+            try {
+                if (editButton) {
+                    const vehicleId = editButton.dataset.vehicleId;
+                    alert(`Editar veículo ${vehicleId}`); // Aqui você abriria um modal de edição
+                } else if (deactivateButton) {
+                    const vehicleId = deactivateButton.dataset.vehicleId;
+                    const confirmed = confirm("Deseja realmente desativar este veículo?");
+                    if (confirmed) {
+                        const response = await fetch(`/fleet/vehicles/${vehicleId}`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ status: "INACTIVE" })
+                        });
+                        if (!response.ok) throw new Error("Não foi possível desativar o veículo.");
+                        await loadVehicles();
+                    }
+                } else if (activateButton) {
+                    const vehicleId = activateButton.dataset.vehicleId;
+                    const confirmed = confirm("Deseja realmente ativar este veículo?");
+                    if (confirmed) {
+                        const response = await fetch(`/fleet/vehicles/${vehicleId}`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ status: "AVAILABLE" })
+                        });
+                        if (!response.ok) throw new Error("Não foi possível ativar o veículo.");
+                        await loadVehicles();
+                    }
+                }
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        // Carrega os veículos ao iniciar a página
+        document.addEventListener("DOMContentLoaded", () => {
+            loadVehicles().catch((error) => {
+                console.error("Erro ao carregar veículos na inicialização:", error);
+                const vehicleStatusDiv = document.getElementById("vehicle-status");
+                if (vehicleStatusDiv) {
+                    vehicleStatusDiv.textContent = `Erro: ${escapeHtml(error.message)}`;
+                }
+                if (vehiclesTableBody) {
+                    vehiclesTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="10">${escapeHtml(error.message)}</td>
+                        </tr>
+                    `;
+                }
+            });
+        });
+    </script>
+{% endblock %}

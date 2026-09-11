@@ -1,308 +1,81 @@
 {% extends "base.html" %}
 
-{% block title %}Frota - AtlasERP{% endblock %}
+{% block title %}Dashboard da Frota - AtlasERP{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div>
-        <h2>Frota</h2>
-        <p>Cadastre veículos e acompanhe manutenções.</p>
+        <h2>🚚 Painel de Controle da Frota</h2>
+        <p style="color: var(--text-muted); font-size: 14px;">Monitoramento em tempo real de veículos, motoristas, rotas e manutenções.</p>
     </div>
-    <button id="reload-button" type="button">Atualizar</button>
+    <div>
+        <a href="/ui/fleet/vehicles" class="btn">+ Novo Veículo</a>
+    </div>
 </div>
 
-<div id="message" class="message"></div>
-
-<section class="panel">
-    <h3>Novo veículo</h3>
-
-    <form id="vehicle-form">
-        <div class="form-grid">
-            <label>
-                Placa
-                <input id="plate" required>
-            </label>
-
-            <label>
-                Tipo
-                <input id="vehicle_type" required>
-            </label>
-
-            <label>
-                Marca
-                <input id="brand">
-            </label>
-
-            <label>
-                Modelo
-                <input id="model">
-            </label>
-
-            <label>
-                Ano de fabricação
-                <input id="manufacture_year" type="number" min="1900">
-            </label>
-
-            <label>
-                Capacidade (kg)
-                <input id="capacity_kg" type="number" min="0" step="0.01">
-            </label>
-
-            <label>
-                Quilometragem atual
-                <input id="current_mileage" type="number" min="0" value="0">
-            </label>
-
-            <label>
-                Status
-                <select id="status">
-                    <option value="AVAILABLE">Disponível</option>
-                    <option value="IN_USE">Em uso</option>
-                    <option value="MAINTENANCE">Manutenção</option>
-                    <option value="INACTIVE">Inativo</option>
-                </select>
-            </label>
-        </div>
-
-        <label>
-            Observações
-            <input id="notes">
-        </label>
-
-        <button type="submit">Cadastrar veículo</button>
-    </form>
-</section>
-
-<section class="panel">
-    <h3>Veículos cadastrados</h3>
-
-    <div id="vehicle-status" class="empty">Carregando veículos...</div>
-
-    <div class="table-wrapper">
-        <table>
-            <thead>
-                <tr>
-                    <th>Placa</th>
-                    <th>Tipo</th>
-                    <th>Marca</th>
-                    <th>Modelo</th>
-                    <th>Ano</th>
-                    <th>Capacidade</th>
-                    <th>Quilometragem</th>
-                    <th>Status</th>
-                    <th>Observações</th>
-                </tr>
-            </thead>
-            <tbody id="vehicles-table"></tbody>
-        </table>
+<!-- Cards Estatísticos da Frota -->
+<div class="cards">
+    <div class="card">
+        <h3>Veículos Disponíveis</h3>
+        <div class="number" id="available-vehicles-count">-</div>
     </div>
-</section>
-
-<section class="panel">
-    <h3>Manutenções</h3>
-
-    <form id="maintenance-filter">
-        <label>
-            Veículo
-            <select id="maintenance-vehicle">
-                <option value="">Todos os veículos</option>
-            </select>
-        </label>
-
-        <button type="submit">Carregar manutenções</button>
-    </form>
-
-    <div id="maintenance-status" class="empty">Carregando manutenções...</div>
-
-    <div class="table-wrapper">
-        <table>
-            <thead>
-                <tr>
-                    <th>Veículo</th>
-                    <th>Descrição</th>
-                    <th>Tipo</th>
-                    <th>Oficina</th>
-                    <th>Abertura</th>
-                    <th>Quilometragem</th>
-                    <th>Custo</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody id="maintenance-table"></tbody>
-        </table>
+    <div class="card">
+        <h3>Em Operação / Uso</h3>
+        <div class="number" id="in-use-vehicles-count" style="color: var(--warning-text);">-</div>
     </div>
-</section>
+    <div class="card">
+        <h3>Em Manutenção</h3>
+        <div class="number" id="maintenance-vehicles-count" style="color: var(--danger-text);">-</div>
+    </div>
+    <div class="card">
+        <h3>Motoristas Ativos</h3>
+        <div class="number" id="active-drivers-count" style="color: var(--accent-cyan);">-</div>
+    </div>
+    <div class="card">
+        <h3>Rotas em Andamento</h3>
+        <div class="number" id="active-routes-count" style="color: var(--success-text);">-</div>
+    </div>
+</div>
 
+<div class="panel">
+    <h3 style="margin-bottom: 16px; font-size: 16px;">⚡ Acesso Rápido às Operações</h3>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <a href="/ui/fleet/vehicles" class="btn btn-secondary">🚘 Gerenciar Veículos</a>
+        <a href="/ui/fleet/drivers" class="btn btn-secondary">👨‍✈️ Gerenciar Motoristas</a>
+        <a href="/ui/fleet/maintenances" class="btn btn-secondary">🔧 Registrar Manutenção</a>
+        <a href="/ui/fleet/routes" class="btn btn-secondary">🗺️ Planejar Rotas</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
-const vehicleTable = document.getElementById("vehicles-table");
-const vehicleStatus = document.getElementById("vehicle-status");
-const maintenanceTable = document.getElementById("maintenance-table");
-const maintenanceStatus = document.getElementById("maintenance-status");
-const maintenanceVehicle = document.getElementById("maintenance-vehicle");
-const vehicleForm = document.getElementById("vehicle-form");
-const maintenanceFilter = document.getElementById("maintenance-filter");
-const message = document.getElementById("message");
+document.addEventListener('DOMContentLoaded', function() {
+    // Busca Resumo de Veículos
+    fetch('/api/fleet/vehicles/summary')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('available-vehicles-count').textContent = data.available || 0;
+            document.getElementById('in-use-vehicles-count').textContent = data.in_use || 0;
+            document.getElementById('maintenance-vehicles-count').textContent = data.maintenance || 0;
+        })
+        .catch(err => console.error('Erro ao carregar resumo de veículos:', err));
 
-function escapeHtml(value) {
-    return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
-}
+    // Busca Contagem de Motoristas Ativos
+    fetch('/api/fleet/drivers/count')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('active-drivers-count').textContent = data.total || 0;
+        })
+        .catch(err => console.error('Erro ao carregar contagem de motoristas:', err));
 
-function statusLabel(status) {
-    const labels = {
-        AVAILABLE: "Disponível",
-        IN_USE: "Em uso",
-        MAINTENANCE: "Manutenção",
-        INACTIVE: "Inativo",
-        OPEN: "Aberta",
-        COMPLETED: "Concluída",
-        CANCELLED: "Cancelada"
-    };
-    return labels[status] || status || "";
-}
-
-function showMessage(text, error = false) {
-    message.textContent = text;
-    message.className = error ? "message error" : "message success";
-}
-
-async function loadVehicles() {
-    const response = await fetch("/fleet/vehicles");
-    const data = await response.json();
-
-    if (!response.ok) {
-        throw new Error(data.error || "Erro ao carregar veículos.");
-    }
-
-    const vehicles = Array.isArray(data) ? data : data.vehicles || [];
-
-    vehicleTable.innerHTML = vehicles.map(vehicle => `
-        <tr>
-            <td>${escapeHtml(vehicle.plate)}</td>
-            <td>${escapeHtml(vehicle.vehicle_type)}</td>
-            <td>${escapeHtml(vehicle.brand)}</td>
-            <td>${escapeHtml(vehicle.model)}</td>
-            <td>${escapeHtml(vehicle.manufacture_year)}</td>
-            <td>${escapeHtml(vehicle.capacity_kg)}</td>
-            <td>${escapeHtml(vehicle.current_mileage)}</td>
-            <td>${escapeHtml(statusLabel(vehicle.status))}</td>
-            <td>${escapeHtml(vehicle.notes)}</td>
-        </tr>
-    `).join("");
-
-    maintenanceVehicle.innerHTML =
-        '<option value="">Todos os veículos</option>' +
-        vehicles.map(vehicle =>
-            `<option value="${vehicle.id}">${escapeHtml(vehicle.plate)} - ${escapeHtml(vehicle.model)}</option>`
-        ).join("");
-
-    vehicleStatus.textContent = vehicles.length
-        ? `${vehicles.length} veículo(s) carregado(s).`
-        : "Nenhum veículo cadastrado.";
-}
-
-async function loadMaintenances() {
-    const selectedVehicle = maintenanceVehicle.value;
-    const query = selectedVehicle
-        ? `?vehicle_id=${encodeURIComponent(selectedVehicle)}`
-        : "";
-
-    const response = await fetch("/fleet/maintenances" + query);
-    const data = await response.json();
-
-    if (!response.ok) {
-        throw new Error(data.error || "Erro ao carregar manutenções.");
-    }
-
-    const maintenances = Array.isArray(data)
-        ? data
-        : data.maintenances || [];
-
-    maintenanceTable.innerHTML = maintenances.map(item => `
-        <tr>
-            <td>${escapeHtml(item.vehicle_plate)}</td>
-            <td>${escapeHtml(item.description)}</td>
-            <td>${escapeHtml(item.maintenance_type)}</td>
-            <td>${escapeHtml(item.workshop)}</td>
-            <td>${escapeHtml(item.opened_at)}</td>
-            <td>${escapeHtml(item.mileage)}</td>
-            <td>${escapeHtml(item.cost)}</td>
-            <td>${escapeHtml(statusLabel(item.status))}</td>
-        </tr>
-    `).join("");
-
-    maintenanceStatus.textContent = maintenances.length
-        ? `${maintenances.length} manutenção(ões) carregada(s).`
-        : "Nenhuma manutenção encontrada.";
-}
-
-vehicleForm.addEventListener("submit", async event => {
-    event.preventDefault();
-
-    const payload = {
-        plate: document.getElementById("plate").value,
-        vehicle_type: document.getElementById("vehicle_type").value,
-        brand: document.getElementById("brand").value,
-        model: document.getElementById("model").value,
-        manufacture_year: document.getElementById("manufacture_year").value || null,
-        capacity_kg: document.getElementById("capacity_kg").value || null,
-        current_mileage: document.getElementById("current_mileage").value || 0,
-        status: document.getElementById("status").value,
-        notes: document.getElementById("notes").value
-    };
-
-    try {
-        const response = await fetch("/fleet/vehicles", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(payload)
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || "Erro ao cadastrar veículo.");
-        }
-
-        vehicleForm.reset();
-        document.getElementById("current_mileage").value = 0;
-        showMessage("Veículo cadastrado com sucesso.");
-        await loadVehicles();
-        await loadMaintenances();
-    } catch (error) {
-        showMessage(error.message, true);
-    }
+    // Busca Contagem de Rotas Ativas
+    fetch('/api/fleet/routes/active/count')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('active-routes-count').textContent = data.total || 0;
+        })
+        .catch(err => console.error('Erro ao carregar contagem de rotas:', err));
 });
-
-document.getElementById("reload-button").addEventListener("click", async () => {
-    try {
-        await loadVehicles();
-        await loadMaintenances();
-        showMessage("Dados atualizados.");
-    } catch (error) {
-        showMessage(error.message, true);
-    }
-});
-
-maintenanceFilter.addEventListener("submit", async event => {
-    event.preventDefault();
-
-    try {
-        await loadMaintenances();
-    } catch (error) {
-        showMessage(error.message, true);
-    }
-});
-
-Promise.all([loadVehicles(), loadMaintenances()])
-    .catch(error => {
-        vehicleStatus.textContent = "Erro: " + error.message;
-        maintenanceStatus.textContent = "Erro: " + error.message;
-        showMessage(error.message, true);
-    });
 </script>
 {% endblock %}
