@@ -903,9 +903,12 @@ def confirm_sale(sale_id):
             )
         except StockMovementError as exc:
             db.session.rollback()
+            err_text = str(exc)
+            if "insufficient stock" in err_text:
+                err_text = f"insufficient stock: Estoque insuficiente para o produto '{product.name}' (Disponível: {product.stock_quantity}, Solicitado: {item.quantity})."
 
             return jsonify({
-                "error": str(exc)
+                "error": err_text
             }), 400
 
     sale.status = CONFIRMED

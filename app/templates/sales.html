@@ -100,9 +100,14 @@
                 Total Estimado da Venda: <strong id="sale-total" style="color: var(--success-text); font-size: 22px; font-weight: 800;">R$ 0,00</strong>
             </div>
 
-            <button type="submit" class="btn" style="padding: 10px 24px; font-size: 15px;">
-                ✓ Confirmar & Salvar Venda
-            </button>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button type="button" id="btn-save-draft" class="btn btn-secondary" style="padding: 10px 18px; font-size: 14px;">
+                    Salvar Pedido em Aberto
+                </button>
+                <button type="submit" id="btn-save-confirm" class="btn" style="padding: 10px 24px; font-size: 14px;">
+                    ✓ Salvar & Confirmar Venda
+                </button>
+            </div>
         </div>
     </form>
 </div>
@@ -275,8 +280,10 @@
         renderItems();
     }
 
-    async function createSale(event) {
-        event.preventDefault();
+    async function createSale(event, autoConfirm = true) {
+        if (event && event.preventDefault) {
+            event.preventDefault();
+        }
 
         if (!customerSelect.value) {
             showMessage("Selecione um cliente.", "error");
@@ -307,7 +314,19 @@
                 throw new Error(data.error || "Erro ao registrar venda.");
             }
 
-            showMessage("Venda registrada com sucesso!");
+            if (autoConfirm) {
+                const confirmResponse = await fetch(`/sales/${data.id}/confirm`, { method: "POST" });
+                const confirmData = await confirmResponse.json();
+
+                if (!confirmResponse.ok) {
+                    throw new Error(confirmData.error || "Venda registrada em aberto, mas houve erro ao confirmar.");
+                }
+
+                showMessage("Venda registrada e confirmada com sucesso!");
+            } else {
+                showMessage("Pedido de venda registrado em aberto com sucesso!");
+            }
+
             saleForm.reset();
             saleItems = [];
             renderItems();
@@ -416,7 +435,11 @@
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || "Erro ao confirmar venda.");
+                let errMsg = data.error || "Erro ao confirmar venda.";
+                if (errMsg === "only open sales can be confirmed") {
+                    errMsg = "Apenas vendas em aberto podem ser confirmadas.";
+                }
+                throw new Error(errMsg);
             }
 
             showMessage("Venda confirmada com sucesso!");
@@ -433,10 +456,14 @@
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || "Erro ao cancelar venda.");
+                let errMsg = data.error || "Erro ao cancelar venda.";
+                if (errMsg === "only open sales can be cancelled") {
+                    errMsg = "Apenas vendas em aberto podem ser canceladas.";
+                }
+                throw new Error(errMsg);
             }
 
-            showMessage("Venda cancelada.");
+            showMessage("Venda cancelada com sucesso!");
             await loadSales();
             await loadOptions();
         } catch (error) {
@@ -445,7 +472,13 @@
     }
 
     document.getElementById("add-item").addEventListener("click", addItem);
-    saleForm.addEventListener("submit", createSale);
+    
+    const btnSaveDraft = document.getElementById("btn-save-draft");
+    if (btnSaveDraft) {
+        btnSaveDraft.addEventListener("click", (e) => createSale(e, false));
+    }
+    
+    saleForm.addEventListener("submit", (e) => createSale(e, true));
     statusFilter.addEventListener("change", loadSales);
     reloadButton.addEventListener("click", async () => {
         await loadOptions();
