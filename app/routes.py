@@ -2025,7 +2025,7 @@ def delete_fleet_route(route_id):
 def get_financial_summary():
     transactions = FinancialTransaction.query.filter_by(status="PAID").all()
     pending_transactions = FinancialTransaction.query.filter_by(status="PENDING").all()
-    payrolls = PayrollExpense.query.filter_by(status="ACTIVE").all()
+    payrolls = PayrollExpense.query.filter(PayrollExpense.status != "INACTIVE").all()
 
     # Integração em tempo real com o Catálogo de Produtos (Estoque)
     products = Product.query.filter_by(is_active=True).all()
