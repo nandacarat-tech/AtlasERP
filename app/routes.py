@@ -61,8 +61,8 @@ def customer_to_dict(customer):
     }
 
 
-def sale_to_dict(sale):
-    return {
+def sale_to_dict(sale, include_names=False):
+    data = {
         "id": sale.id,
         "customer_id": sale.customer_id,
         "status": sale.status,
@@ -77,6 +77,11 @@ def sale_to_dict(sale):
             for item in sale.items
         ],
     }
+    if include_names:
+        data["customer_name"] = sale.customer.name if sale.customer else "Cliente Não Identificado"
+        for i, item in enumerate(sale.items):
+            data["items"][i]["product_name"] = item.product.name if item.product else "Produto"
+    return data
 
 def supplier_to_dict(supplier):
     return {
@@ -253,12 +258,17 @@ def dashboard():
     pending_payroll = [p for p in payroll_list if p.status == "PENDING"]
     pending_payroll_amount = sum((p.total_cost for p in pending_payroll), Decimal("0.00"))
 
+    active_vehicles_count = FleetVehicle.query.filter_by(status="ACTIVE").count()
+    routes_in_progress_count = Route.query.filter_by(status="IN_PROGRESS").count()
+    recent_sales = [sale_to_dict(s, include_names=True) for s in Sale.query.order_by(Sale.id.desc()).limit(5).all()]
+
     return render_template(
         "index.html",
         products=[product_to_dict(product) for product in products],
         customers=[customer_to_dict(customer) for customer in customers],
         suppliers=[supplier_to_dict(supplier) for supplier in suppliers],
         sales=[sale_to_dict(sale) for sale in sales],
+        recent_sales=recent_sales,
         purchases=[purchase_to_dict(purchase) for purchase in purchases],
         out_of_stock_products=out_of_stock_products,
         low_stock_products=low_stock_products,
@@ -277,6 +287,8 @@ def dashboard():
         pending_returns_count=pending_returns_count,
         pending_payroll_count=len(pending_payroll),
         pending_payroll_amount=pending_payroll_amount,
+        active_vehicles_count=active_vehicles_count,
+        routes_in_progress_count=routes_in_progress_count,
     )
 
 
