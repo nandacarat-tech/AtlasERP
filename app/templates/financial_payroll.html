@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Custos de Pessoal - AtlasERP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Custos de Pessoal & Folha de Pagamento</h2>
+        <p style="color: var(--text-muted); font-size: 14px;">Gestão de salários, encargos trabalhistas (INSS/FGTS) e benefícios por colaborador.</p>
+    </div>
+</div>
+
+<div class="panel">
+    <h3 style="margin-bottom: 16px; font-size: 16px;">Cadastrar Novo Colaborador / Custo</h3>
+    <form id="payroll-form">
+        <div class="form-grid">
+            <label>
+                Nome do Colaborador:
+                <input type="text" id="employee_name" required placeholder="Ex: Fernanda Santos">
+            </label>
+            <label>
+                Cargo:
+                <input type="text" id="role" required placeholder="Ex: Gerente de Operações">
+            </label>
+            <label>
+                Salário Base (R$):
+                <input type="number" step="0.01" id="base_salary" required placeholder="0.00">
+            </label>
+            <label>
+                Encargos (INSS/FGTS R$):
+                <input type="number" step="0.01" id="charges_amount" placeholder="0.00">
+            </label>
+            <label>
+                Benefícios (VR/VT/Saúde R$):
+                <input type="number" step="0.01" id="benefits_amount" placeholder="0.00">
+            </label>
+        </div>
+        <div style="margin-top: 12px;">
+            <button type="submit" class="btn">Cadastrar Custo de Pessoal</button>
+        </div>
+    </form>
+</div>
+
+<div class="panel">
+    <h3 style="margin-bottom: 16px; font-size: 16px;">Quadro de Colaboradores e Custos</h3>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Colaborador</th>
+                    <th>Cargo</th>
+                    <th>Salário Base</th>
+                    <th>Encargos</th>
+                    <th>Benefícios</th>
+                    <th>Custo Total Mensal</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="payroll-table-body">
+                <tr>
+                    <td colspan="8">Carregando folha de pagamento...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function formatMoney(value) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+}
+
+function loadPayroll() {
+    fetch('/api/financial/payroll')
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('payroll-table-body');
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty">Nenhum colaborador registrado.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td><strong>${item.employee_name}</strong></td>
+                    <td>${item.role}</td>
+                    <td>${formatMoney(item.base_salary)}</td>
+                    <td>${formatMoney(item.charges_amount)}</td>
+                    <td>${formatMoney(item.benefits_amount)}</td>
+                    <td style="font-weight: 800; color: var(--accent-cyan);">${formatMoney(item.total_cost)}</td>
+                    <td><span class="status ${item.status.toLowerCase()}">${item.status === 'ACTIVE' ? 'Ativo' : 'Inativo'}</span></td>
+                    <td>
+                        <button onclick="deletePayroll(${item.id})" class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;">Excluir</button>
+                    </td>
+                </tr>
+            `).join('');
+        });
+}
+
+function deletePayroll(id) {
+    if (!confirm('Deseja remover este colaborador da folha?')) return;
+    fetch(`/api/financial/payroll/${id}`, { method: 'DELETE' })
+        .then(() => loadPayroll());
+}
+
+document.getElementById('payroll-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const payload = {
+        employee_name: document.getElementById('employee_name').value,
+        role: document.getElementById('role').value,
+        base_salary: document.getElementById('base_salary').value,
+        charges_amount: document.getElementById('charges_amount').value || 0,
+        benefits_amount: document.getElementById('benefits_amount').value || 0,
+    };
+
+    fetch('/api/financial/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            document.getElementById('payroll-form').reset();
+            loadPayroll();
+        }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadPayroll();
+});
+</script>
+{% endblock %}

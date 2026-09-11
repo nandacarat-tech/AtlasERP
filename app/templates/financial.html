@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Painel Financeiro & DRE - AtlasERP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Painel Financeiro & Tomada de Decisão</h2>
+        <p style="color: var(--text-muted); font-size: 14px;">Demonstrativo de resultados, fluxo de caixa e estrutura de custos empresariais.</p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <a href="/ui/financial/transactions" class="btn">+ Novo Lançamento</a>
+        <a href="/ui/financial/payroll" class="btn btn-secondary">+ Custos de Pessoal</a>
+    </div>
+</div>
+
+<!-- Cards Estratégicos Financeiros -->
+<div class="cards">
+    <div class="card">
+        <h3>Receita Total</h3>
+        <div class="number" id="total-revenue" style="color: var(--success-text);">R$ 0,00</div>
+    </div>
+    <div class="card">
+        <h3>Custos Fixos</h3>
+        <div class="number" id="fixed-costs" style="color: var(--warning-text);">R$ 0,00</div>
+    </div>
+    <div class="card">
+        <h3>Custos Variáveis</h3>
+        <div class="number" id="variable-costs" style="color: var(--warning-text);">R$ 0,00</div>
+    </div>
+    <div class="card">
+        <h3>Custos de Pessoal / Folha</h3>
+        <div class="number" id="total-payroll" style="color: var(--accent-cyan);">R$ 0,00</div>
+    </div>
+    <div class="card">
+        <h3>Resultado Líquido</h3>
+        <div class="number" id="net-result">R$ 0,00</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+    <!-- Resumo do Fluxo de Caixa -->
+    <div class="panel">
+        <h3 style="margin-bottom: 16px; font-size: 16px;">Contas Pendentes de Vencimento</h3>
+        <table style="width: 100%;">
+            <tbody>
+                <tr>
+                    <td><strong>Contas a Pagar (A Vencer):</strong></td>
+                    <td style="text-align: right; color: var(--danger-text); font-weight: 700;" id="pending-payable">R$ 0,00</td>
+                </tr>
+                <tr>
+                    <td><strong>Contas a Receber (A Vencer):</strong></td>
+                    <td style="text-align: right; color: var(--success-text); font-weight: 700;" id="pending-receivable">R$ 0,00</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Indicadores de Decisão -->
+    <div class="panel">
+        <h3 style="margin-bottom: 16px; font-size: 16px;">Indicadores de Saúde Financeira</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Com base nos custos cadastrados no AtlasERP:</p>
+        <ul style="list-style: none; display: grid; gap: 8px; font-size: 14px;">
+            <li>✅ <strong>Ponto de Equilíbrio:</strong> Custos Fixos + Pessoal controlados.</li>
+            <li>📊 <strong>Margem Operacional:</strong> Calculada em tempo real com base no faturamento.</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function formatMoney(value) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/financial/summary')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('total-revenue').textContent = formatMoney(data.total_revenue);
+            document.getElementById('fixed-costs').textContent = formatMoney(data.fixed_costs);
+            document.getElementById('variable-costs').textContent = formatMoney(data.variable_costs);
+            document.getElementById('total-payroll').textContent = formatMoney(data.total_payroll);
+            document.getElementById('pending-payable').textContent = formatMoney(data.pending_payable);
+            document.getElementById('pending-receivable').textContent = formatMoney(data.pending_receivable);
+            
+            const netRes = parseFloat(data.net_result || 0);
+            const netElem = document.getElementById('net-result');
+            netElem.textContent = formatMoney(netRes);
+            netElem.style.color = netRes >= 0 ? 'var(--success-text)' : 'var(--danger-text)';
+        })
+        .catch(err => console.error('Erro ao carregar dados financeiro:', err));
+});
+</script>
+{% endblock %}

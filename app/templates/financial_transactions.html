@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Contas & Custos - AtlasERP{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Contas & Lançamentos de Custos</h2>
+        <p style="color: var(--text-muted); font-size: 14px;">Gerencie receitas, despesas, custos fixos e variáveis da empresa.</p>
+    </div>
+</div>
+
+<div id="message" class="message"></div>
+
+<!-- Formulário de Lançamento -->
+<div class="panel">
+    <h3 style="margin-bottom: 16px; font-size: 16px;">Novo Lançamento Financeiro</h3>
+    <form id="transaction-form">
+        <div class="form-grid">
+            <label>
+                Descrição:
+                <input type="text" id="description" required placeholder="Ex: Aluguel da Sede, Conta de Luz...">
+            </label>
+            <label>
+                Valor (R$):
+                <input type="number" step="0.01" id="amount" required placeholder="0.00">
+            </label>
+            <label>
+                Tipo:
+                <select id="transaction_type">
+                    <option value="EXPENSE">Despesa / Custo</option>
+                    <option value="REVENUE">Receita / Entrada</option>
+                </select>
+            </label>
+            <label>
+                Categoria:
+                <select id="category_id">
+                    <option value="">Carregando categorias...</option>
+                </select>
+            </label>
+            <label>
+                Data de Vencimento:
+                <input type="date" id="due_date" required>
+            </label>
+            <label>
+                Status:
+                <select id="status">
+                    <option value="PENDING">Pendente (A Vencer/Pagar)</option>
+                    <option value="PAID">Pago / Concluído</option>
+                </select>
+            </label>
+        </div>
+        <div style="margin-top: 12px;">
+            <button type="submit" class="btn">Salvar Lançamento</button>
+        </div>
+    </form>
+</div>
+
+<!-- Tabela de Lançamentos -->
+<div class="panel">
+    <h3 style="margin-bottom: 16px; font-size: 16px;">Histórico de Lançamentos</h3>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Descrição</th>
+                    <th>Tipo</th>
+                    <th>Categoria</th>
+                    <th>Valor</th>
+                    <th>Vencimento</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="transactions-table-body">
+                <tr>
+                    <td colspan="7">Carregando lançamentos...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function formatMoney(value) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+}
+
+function loadCategories() {
+    fetch('/api/financial/categories')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('category_id');
+            select.innerHTML = '<option value="">Sem Categoria</option>';
+            data.forEach(cat => {
+                select.innerHTML += `<option value="${cat.id}">${cat.name} (${cat.category_type})</option>`;
+            });
+        });
+}
+
+function loadTransactions() {
+    fetch('/api/financial/transactions')
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('transactions-table-body');
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty">Nenhum lançamento cadastrado.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td><strong>${item.description}</strong></td>
+                    <td><span class="status ${item.transaction_type.toLowerCase()}">${item.transaction_type === 'EXPENSE' ? 'Despesa' : 'Receita'}</span></td>
+                    <td>${item.category_name}</td>
+                    <td style="font-weight: 700; color: ${item.transaction_type === 'EXPENSE' ? 'var(--danger-text)' : 'var(--success-text)'};">${formatMoney(item.amount)}</td>
+                    <td>${item.due_date || '-'}</td>
+                    <td><span class="status ${item.status.toLowerCase()}">${item.status === 'PAID' ? 'Pago' : 'Pendente'}</span></td>
+                    <td>
+                        ${item.status === 'PENDING' ? `<button onclick="markAsPaid(${item.id})" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Marcar Pago</button>` : ''}
+                        <button onclick="deleteTransaction(${item.id})" class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;">Excluir</button>
+                    </td>
+                </tr>
+            `).join('');
+        });
+}
+
+function markAsPaid(id) {
+    fetch(`/api/financial/transactions/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'PAID' })
+    }).then(() => loadTransactions());
+}
+
+function deleteTransaction(id) {
+    if (!confirm('Deseja excluir este lançamento?')) return;
+    fetch(`/api/financial/transactions/${id}`, { method: 'DELETE' })
+        .then(() => loadTransactions());
+}
+
+document.getElementById('transaction-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const payload = {
+        description: document.getElementById('description').value,
+        amount: document.getElementById('amount').value,
+        transaction_type: document.getElementById('transaction_type').value,
+        category_id: document.getElementById('category_id').value || null,
+        due_date: document.getElementById('due_date').value,
+        status: document.getElementById('status').value,
+    };
+
+    fetch('/api/financial/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            document.getElementById('transaction-form').reset();
+            loadTransactions();
+        }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadCategories();
+    loadTransactions();
+});
+</script>
+{% endblock %}

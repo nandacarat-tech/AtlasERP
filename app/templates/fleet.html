@@ -5,7 +5,7 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h2>🚚 Painel de Controle da Frota</h2>
+        <h2>Painel de Controle da Frota</h2>
         <p style="color: var(--text-muted); font-size: 14px;">Monitoramento em tempo real de veículos, motoristas, rotas e manutenções.</p>
     </div>
     <div>
@@ -38,12 +38,12 @@
 </div>
 
 <div class="panel">
-    <h3 style="margin-bottom: 16px; font-size: 16px;">⚡ Acesso Rápido às Operações</h3>
+    <h3 style="margin-bottom: 16px; font-size: 16px;">Acesso Rápido às Operações</h3>
     <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-        <a href="/ui/fleet/vehicles" class="btn btn-secondary">🚘 Gerenciar Veículos</a>
-        <a href="/ui/fleet/drivers" class="btn btn-secondary">👨‍✈️ Gerenciar Motoristas</a>
-        <a href="/ui/fleet/maintenances" class="btn btn-secondary">🔧 Registrar Manutenção</a>
-        <a href="/ui/fleet/routes" class="btn btn-secondary">🗺️ Planejar Rotas</a>
+        <a href="/ui/fleet/vehicles" class="btn btn-secondary">Gerenciar Veículos</a>
+        <a href="/ui/fleet/drivers" class="btn btn-secondary">Gerenciar Motoristas</a>
+        <a href="/ui/fleet/maintenances" class="btn btn-secondary">Registrar Manutenção</a>
+        <a href="/ui/fleet/routes" class="btn btn-secondary">Planejar Rotas</a>
     </div>
 </div>
 {% endblock %}
@@ -51,7 +51,6 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Busca Resumo de Veículos
     fetch('/api/fleet/vehicles/summary')
         .then(response => response.json())
         .then(data => {
@@ -61,7 +60,6 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(err => console.error('Erro ao carregar resumo de veículos:', err));
 
-    // Busca Contagem de Motoristas Ativos
     fetch('/api/fleet/drivers/count')
         .then(response => response.json())
         .then(data => {
@@ -69,7 +67,6 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(err => console.error('Erro ao carregar contagem de motoristas:', err));
 
-    // Busca Contagem de Rotas Ativas
     fetch('/api/fleet/routes/active/count')
         .then(response => response.json())
         .then(data => {
