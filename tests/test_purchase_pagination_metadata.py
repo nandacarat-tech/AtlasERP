@@ -8,7 +8,7 @@ from app.supplier_models import Supplier
 def test_paginated_purchase_response_contains_metadata(client, app):
     with app.app_context():
         supplier = Supplier(
-            document="META-SUP-001",
+            document="11222333000181",
             name="Fornecedor Metadados",
             is_active=True,
         )
@@ -48,13 +48,13 @@ def test_paginated_purchase_response_supports_filters(
 ):
     with app.app_context():
         supplier_a = Supplier(
-            document="META-SUP-002",
+            document="00000000000191",
             name="Fornecedor Metadados A",
             is_active=True,
         )
 
         supplier_b = Supplier(
-            document="META-SUP-003",
+            document="12345678000195",
             name="Fornecedor Metadados B",
             is_active=True,
         )

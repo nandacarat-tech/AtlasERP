@@ -11,7 +11,7 @@ def test_list_purchases_returns_items_ordered_by_id(
 ):
     with app.app_context():
         supplier = Supplier(
-            document="ORDER-SUP-001",
+            document="11222333000181",
             name="Fornecedor Ordenação",
             is_active=True,
         )

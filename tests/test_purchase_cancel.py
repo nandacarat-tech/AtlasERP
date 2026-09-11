@@ -8,7 +8,7 @@ from app.supplier_models import Supplier
 def test_open_purchase_can_be_canceled(client, app):
     with app.app_context():
         supplier = Supplier(
-            document="CANCEL-SUP-001",
+            document="11222333000181",
             name="Fornecedor Cancelamento",
             is_active=True,
         )
@@ -38,7 +38,7 @@ def test_open_purchase_can_be_canceled(client, app):
 def test_received_purchase_cannot_be_canceled(client, app):
     with app.app_context():
         supplier = Supplier(
-            document="CANCEL-SUP-002",
+            document="00000000000191",
             name="Fornecedor Recebido",
             is_active=True,
         )

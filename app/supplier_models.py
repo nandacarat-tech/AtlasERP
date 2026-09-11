@@ -1,4 +1,6 @@
+from sqlalchemy.orm import validates
 from app import db
+from app.validators import validate_document, validate_phone
 
 
 class Supplier(db.Model):
@@ -39,3 +41,19 @@ class Supplier(db.Model):
         nullable=False,
         server_default=db.func.now(),
     )
+
+    @validates("document")
+    def validate_document_field(self, key, value):
+        is_valid, formatted, err = validate_document(value)
+        if not is_valid:
+            raise ValueError(err)
+        return formatted
+
+    @validates("phone")
+    def validate_phone_field(self, key, value):
+        if not value:
+            return None
+        is_valid, formatted, err = validate_phone(value)
+        if not is_valid:
+            raise ValueError(err)
+        return formatted

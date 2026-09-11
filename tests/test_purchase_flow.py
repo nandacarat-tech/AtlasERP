@@ -11,7 +11,7 @@ def test_purchase_full_flow(client, app):
     supplier_response = client.post(
         "/suppliers",
         json={
-            "document": "SUP-0001",
+            "document": "11222333000181",
             "name": "Fornecedor Teste",
             "email": "supplier.test@example.com",
         },
@@ -81,7 +81,7 @@ def test_purchase_full_flow(client, app):
 def test_received_purchase_cannot_be_received_twice(client, app):
     with app.app_context():
         supplier = Supplier(
-            document="SUP-0002",
+            document="00000000000191",
             name="Outro Fornecedor",
             is_active=True,
         )

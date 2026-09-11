@@ -11,13 +11,13 @@ def test_list_purchases_combines_status_and_supplier_filters(
 ):
     with app.app_context():
         supplier_a = Supplier(
-            document="COMBINED-SUP-001",
+            document="11222333000181",
             name="Fornecedor Filtro Combinado A",
             is_active=True,
         )
 
         supplier_b = Supplier(
-            document="COMBINED-SUP-002",
+            document="00000000000191",
             name="Fornecedor Filtro Combinado B",
             is_active=True,
         )
@@ -67,7 +67,7 @@ def test_list_purchases_combined_filters_return_empty_list(
 ):
     with app.app_context():
         supplier = Supplier(
-            document="COMBINED-SUP-003",
+            document="12345678000195",
             name="Fornecedor Sem Resultado",
             is_active=True,
         )
@@ -100,7 +100,7 @@ def test_list_purchases_combined_filters_with_pagination(
 ):
     with app.app_context():
         supplier = Supplier(
-            document="COMBINED-SUP-004",
+            document="60701190000104",
             name="Fornecedor Com Paginação",
             is_active=True,
         )
@@ -167,7 +167,7 @@ def test_list_purchases_combined_filters_second_page(
 ):
     with app.app_context():
         supplier = Supplier(
-            document="COMBINED-SUP-005",
+            document="33000167000101",
             name="Fornecedor Segunda Página",
             is_active=True,
         )

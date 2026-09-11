@@ -34,7 +34,7 @@ def create_purchase(supplier_id, status):
 def test_list_purchases_filters_by_status(client, app):
     with app.app_context():
         supplier = create_supplier(
-            "FILTER-SUP-001",
+            "11222333000181",
             "Fornecedor Filtro Status",
         )
 
@@ -57,12 +57,12 @@ def test_list_purchases_filters_by_status(client, app):
 def test_list_purchases_filters_by_supplier(client, app):
     with app.app_context():
         supplier_a = create_supplier(
-            "FILTER-SUP-002",
+            "00000000000191",
             "Fornecedor A",
         )
 
         supplier_b = create_supplier(
-            "FILTER-SUP-003",
+            "12345678000195",
             "Fornecedor B",
         )
 
@@ -94,12 +94,12 @@ def test_list_purchases_filters_by_status_and_supplier(
 ):
     with app.app_context():
         supplier_a = create_supplier(
-            "FILTER-SUP-004",
+            "60701190000104",
             "Fornecedor Combinado A",
         )
 
         supplier_b = create_supplier(
-            "FILTER-SUP-005",
+            "33000167000101",
             "Fornecedor Combinado B",
         )
 

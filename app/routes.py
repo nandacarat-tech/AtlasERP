@@ -1013,7 +1013,12 @@ def create_supplier():
             {"error": "document and name are required"}
         ), 400
 
-    if Supplier.query.filter_by(document=document).first():
+    from app.validators import validate_document
+    is_valid_doc, formatted_doc, doc_err = validate_document(document)
+    if not is_valid_doc:
+        return jsonify({"error": doc_err}), 400
+
+    if Supplier.query.filter_by(document=formatted_doc).first():
         return jsonify(
             {"error": "supplier document already exists"}
         ), 409
@@ -1025,16 +1030,20 @@ def create_supplier():
             {"error": "supplier email already exists"}
         ), 409
 
-    supplier = Supplier(
-        document=document,
-        name=name,
-        email=email,
-        phone=data.get("phone"),
-        is_active=data.get("is_active", True),
-    )
+    try:
+        supplier = Supplier(
+            document=document,
+            name=name,
+            email=email,
+            phone=data.get("phone"),
+            is_active=data.get("is_active", True),
+        )
 
-    db.session.add(supplier)
-    db.session.commit()
+        db.session.add(supplier)
+        db.session.commit()
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
 
     return jsonify(supplier_to_dict(supplier)), 201
 
@@ -1054,11 +1063,28 @@ def update_supplier(supplier_id):
 
     data = request.get_json(silent=True) or {}
 
-    allowed_fields = {"document", "name", "email", "phone"}
+    if "document" in data and data["document"]:
+        from app.validators import validate_document
+        is_valid_doc, formatted_doc, doc_err = validate_document(data["document"])
+        if not is_valid_doc:
+            return jsonify({"error": doc_err}), 400
 
-    for field in allowed_fields:
-        if field in data:
-            setattr(supplier, field, data[field])
+        existing = Supplier.query.filter(
+            Supplier.document == formatted_doc,
+            Supplier.id != supplier.id,
+        ).first()
+
+        if existing:
+            return jsonify({"error": "supplier document already exists"}), 409
+
+    if "email" in data and data["email"]:
+        existing = Supplier.query.filter(
+            Supplier.email == data["email"],
+            Supplier.id != supplier.id,
+        ).first()
+
+        if existing:
+            return jsonify({"error": "supplier email already exists"}), 409
 
     if "is_active" in data:
         if not isinstance(data["is_active"], bool):
@@ -1066,9 +1092,20 @@ def update_supplier(supplier_id):
                 "error": "is_active must be a boolean"
             }), 400
 
-        supplier.is_active = data["is_active"]
+    try:
+        allowed_fields = {"document", "name", "email", "phone"}
 
-    db.session.commit()
+        for field in allowed_fields:
+            if field in data:
+                setattr(supplier, field, data[field])
+
+        if "is_active" in data:
+            supplier.is_active = data["is_active"]
+
+        db.session.commit()
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
 
     return jsonify(supplier_to_dict(supplier))
 

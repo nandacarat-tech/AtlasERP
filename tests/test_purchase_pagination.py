@@ -8,7 +8,7 @@ from app.supplier_models import Supplier
 def test_list_purchases_supports_pagination(client, app):
     with app.app_context():
         supplier = Supplier(
-            document="PAGE-SUP-001",
+            document="11222333000181",
             name="Fornecedor Paginação",
             is_active=True,
         )
