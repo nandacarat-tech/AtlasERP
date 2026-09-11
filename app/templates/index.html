@@ -1,243 +1,229 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
-{% block title %}Dashboard - AtlasERP{% endblock %}
+{% block title %}Dashboard Didático - AtlasERP{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h2>Visão geral</h2>
-</div>
-
-<div class="cards">
-    <div class="card">
-        <h3>Total de produtos</h3>
-        <div id="total-products" class="number">0</div>
-    </div>
-
-    <div class="card">
-        <h3>Produtos ativos</h3>
-        <div id="active-products" class="number">0</div>
-    </div>
-
-    <div class="card">
-        <h3>Estoque total</h3>
-        <div id="total-stock" class="number">0</div>
-    </div>
-
-    <div class="card">
-        <h3>Clientes</h3>
-        <div id="total-customers" class="number">0</div>
-    </div>
-
-    <div class="card">
-        <h3>Fornecedores</h3>
-        <div id="total-suppliers" class="number">0</div>
-    </div>
-
-    <div class="card">
-        <h3>Vendas</h3>
-        <div id="total-sales" class="number">0</div>
-    </div>
-
-    <div class="card">
-        <h3>Compras</h3>
-        <div id="total-purchases" class="number">0</div>
+<!-- Banner de Boas-Vindas Didático -->
+<div class="page-header" style="background: var(--card-bg); padding: 24px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 24px;">
+    <div>
+        <h2 style="font-size: 22px; color: var(--text-color); margin-bottom: 6px;">Painel de Controle do Seu Negócio</h2>
+        <p style="color: var(--text-muted); font-size: 14px; margin: 0;">Acompanhe o dinheiro da sua empresa, as tarefas do dia e a reposição de produtos de forma simples e direta.</p>
     </div>
 </div>
 
-<div class="panel">
-    <div class="page-header">
-        <h2>Alertas operacionais</h2>
-    </div>
+<!-- SEÇÃO 1: Saúde Financeira do Seu Negócio -->
+<div style="margin-bottom: 32px;">
+    <h3 style="font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-indigo)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Saúde Financeira do Seu Negócio
+    </h3>
 
-    <div class="alerts-grid">
-        <div class="alert-card danger">
-            <h3>Sem estoque</h3>
-            <div class="number">
-                {{ out_of_stock_products|length }}
+    <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+        <div class="card" style="border-left: 4px solid var(--success-text);">
+            <h3 style="font-size: 13px; color: var(--text-muted);">Vendas (Dinheiro que Entrou)</h3>
+            <div class="number" style="color: var(--success-text); font-size: 24px; font-weight: 700; margin: 8px 0;">
+                R$ {{ "%.2f"|format(total_revenue)|replace('.', ',') }}
             </div>
-            {% if out_of_stock_products %}
-                <ul>
-                    {% for product in out_of_stock_products %}
-                        <li>{{ product.name }} — {{ product.sku }}</li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p>Nenhum produto sem estoque.</p>
-            {% endif %}
+            <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Valor total com vendas confirmadas.</p>
         </div>
 
-        <div class="alert-card warning">
-            <h3>Estoque baixo</h3>
-            <div class="number">
-                {{ low_stock_products|length }}
+        <div class="card" style="border-left: 4px solid var(--danger-text);">
+            <h3 style="font-size: 13px; color: var(--text-muted);">Contas & Custos (Dinheiro que Saiu)</h3>
+            <div class="number" style="color: var(--danger-text); font-size: 24px; font-weight: 700; margin: 8px 0;">
+                R$ {{ "%.2f"|format(total_expenses)|replace('.', ',') }}
             </div>
-            {% if low_stock_products %}
-                <ul>
-                    {% for product in low_stock_products %}
-                        <li>
-                            {{ product.name }} —
-                            {{ product.stock_quantity }} unidade(s)
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p>Nenhum produto com estoque baixo.</p>
-            {% endif %}
+            <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Total de despesas operacionais registradas.</p>
         </div>
 
-        <div class="alert-card">
-            <h3>Produtos inativos</h3>
-            <div class="number">
-                {{ inactive_products|length }}
+        <div class="card" style="border-left: 4px solid {% if net_result >= 0 %}var(--success-text){% else %}var(--danger-text){% endif %};">
+            <h3 style="font-size: 13px; color: var(--text-muted);">Resultado do Negócio (Sobrou Dinheiro?)</h3>
+            <div class="number" style="color: {% if net_result >= 0 %}var(--success-text){% else %}var(--danger-text){% endif %}; font-size: 24px; font-weight: 700; margin: 8px 0;">
+                R$ {{ "%.2f"|format(net_result)|replace('.', ',') }}
             </div>
-            <p>Produtos desativados no cadastro.</p>
+            <p style="font-size: 12px; margin: 0;">
+                {% if net_result >= 0 %}
+                    <span style="color: var(--success-text); font-weight: 600;">Seu negócio está no azul (com lucro)!</span>
+                {% else %}
+                    <span style="color: var(--danger-text); font-weight: 600;">Atenção: As despesas superam as vendas.</span>
+                {% endif %}
+            </p>
         </div>
 
-        <div class="alert-card">
-            <h3>Vendas em aberto</h3>
-            <div class="number">
-                {{ open_sales|length }}
+        <div class="card" style="border-left: 4px solid var(--accent-cyan);">
+            <h3 style="font-size: 13px; color: var(--text-muted);">Dinheiro Guardado em Produtos</h3>
+            <div class="number" style="color: var(--accent-cyan); font-size: 24px; font-weight: 700; margin: 8px 0;">
+                R$ {{ "%.2f"|format(inventory_capital)|replace('.', ',') }}
             </div>
-            <p>Vendas aguardando confirmação.</p>
-        </div>
-
-        <div class="alert-card">
-            <h3>Compras em aberto</h3>
-            <div class="number">
-                {{ open_purchases|length }}
-            </div>
-            <p>Compras aguardando recebimento.</p>
+            <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Capital parado em mercadorias no estoque.</p>
         </div>
     </div>
 </div>
 
-<div class="panel">
-    <div class="page-header">
-    <h2>Produtos cadastrados</h2>
+<!-- SEÇÃO 2: Central de Tarefas do Empreendedor ("O que precisa da sua atenção hoje?") -->
+<div class="panel" style="margin-bottom: 32px; padding: 24px;">
+    <h3 style="font-size: 16px; margin-bottom: 18px; display: flex; align-items: center; gap: 8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--warning-text)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        O Que Precisa da Sua Atenção Hoje? (Tarefas Pendentes)
+    </h3>
 
-    <div class="actions">
-        <button id="reload-button" class="secondary" type="button">
-            ↻ Atualizar dados
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+        <!-- Alerta Financeiro: Contas a Pagar -->
+        <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <span class="badge badge-danger" style="margin-bottom: 8px; inline-block;">Financeiro</span>
+                <h4 style="margin: 6px 0; font-size: 15px;">Contas a Pagar Pendentes</h4>
+                <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 12px 0;">
+                    Você tem <strong>{{ pending_bills_count }}</strong> conta(s) a pagar somando <strong>R$ {{ "%.2f"|format(pending_bills_amount)|replace('.', ',') }}</strong>.
+                </p>
+            </div>
+            <a href="/ui/financial/transactions" class="btn btn-secondary" style="align-self: flex-start; padding: 6px 12px; font-size: 12px;">Ver Contas a Pagar</a>
+        </div>
+
+        <!-- Alerta Financeiro: Contas a Receber -->
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <span class="badge badge-success" style="margin-bottom: 8px; inline-block;">Financeiro</span>
+                <h4 style="margin: 6px 0; font-size: 15px;">Contas a Receber de Clientes</h4>
+                <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 12px 0;">
+                    Existem <strong>{{ pending_receivables_count }}</strong> recebimento(s) pendente(s) totalizando <strong>R$ {{ "%.2f"|format(pending_receivables_amount)|replace('.', ',') }}</strong>.
+                </p>
+            </div>
+            <a href="/ui/financial/transactions" class="btn btn-secondary" style="align-self: flex-start; padding: 6px 12px; font-size: 12px;">Ver Recebimentos</a>
+        </div>
+
+        <!-- Alerta Financeiro: Custos com Pessoal -->
+        <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <span class="badge badge-info" style="margin-bottom: 8px; inline-block;">Folha de Pagamento</span>
+                <h4 style="margin: 6px 0; font-size: 15px;">Salários e Colaboradores</h4>
+                <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 12px 0;">
+                    Há <strong>{{ pending_payroll_count }}</strong> pagamento(s) de pessoal pendente(s) (R$ {{ "%.2f"|format(pending_payroll_amount)|replace('.', ',') }}).
+                </p>
+            </div>
+            <a href="/ui/financial/payroll" class="btn btn-secondary" style="align-self: flex-start; padding: 6px 12px; font-size: 12px;">Gerenciar Salários</a>
+        </div>
+
+        <!-- Alerta Estoque: Produtos Acabando ou Zerados -->
+        <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <span class="badge badge-warning" style="margin-bottom: 8px; inline-block;">Estoque</span>
+                <h4 style="margin: 6px 0; font-size: 15px;">Produtos Acabando ou Esgotados</h4>
+                <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 12px 0;">
+                    <strong>{{ out_of_stock_products|length }}</strong> produto(s) esgotado(s) e <strong>{{ low_stock_products|length }}</strong> com estoque baixo.
+                </p>
+            </div>
+            <a href="/ui/products" class="btn btn-secondary" style="align-self: flex-start; padding: 6px 12px; font-size: 12px;">Repor Produtos</a>
+        </div>
+
+        <!-- Alerta Fiscal: Notas Fiscais a Emitir -->
+        <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <span class="badge badge-info" style="margin-bottom: 8px; inline-block;">Fiscal NF-e</span>
+                <h4 style="margin: 6px 0; font-size: 15px;">Notas Fiscais Pendentes</h4>
+                <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 12px 0;">
+                    Você possui <strong>{{ pending_invoices_count }}</strong> venda(s) aguardando emissão na SEFAZ.
+                </p>
+            </div>
+            <a href="/ui/financial/invoices" class="btn btn-secondary" style="align-self: flex-start; padding: 6px 12px; font-size: 12px;">Emitir Notas Fiscais</a>
+        </div>
+
+        <!-- Alerta Logística: Entregas Mal-Sucedidas -->
+        <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <span class="badge badge-danger" style="margin-bottom: 8px; inline-block;">Frota / Entregas</span>
+                <h4 style="margin: 6px 0; font-size: 15px;">Retorno de Entregas</h4>
+                <p style="font-size: 13px; color: var(--text-muted); margin: 4px 0 12px 0;">
+                    Existem <strong>{{ pending_returns_count }}</strong> entrega(s) que voltaram precisando de resolução.
+                </p>
+            </div>
+            <a href="/ui/fleet/returns" class="btn btn-secondary" style="align-self: flex-start; padding: 6px 12px; font-size: 12px;">Tratar Devoluções</a>
+        </div>
+    </div>
+</div>
+
+<!-- SEÇÃO 3: Atalhos Rápidos do Dia a Dia -->
+<div class="panel" style="margin-bottom: 32px; padding: 24px;">
+    <h3 style="font-size: 16px; margin-bottom: 16px;">O Que Você Deseja Fazer Agora? (Acesso Rápido)</h3>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <a href="/ui/sales" class="btn" style="padding: 10px 16px;">+ Nova Venda</a>
+        <a href="/ui/purchases" class="btn btn-secondary" style="padding: 10px 16px;">+ Dar Entrada em Compras</a>
+        <a href="/ui/financial/transactions" class="btn btn-secondary" style="padding: 10px 16px;">+ Lançar Conta a Pagar</a>
+        <a href="/ui/fleet/routes" class="btn btn-secondary" style="padding: 10px 16px;">+ Planejar Rotas de Entrega</a>
+    </div>
+</div>
+
+<!-- SEÇÃO 4: Lista Didática de Produtos & Nível de Estoque Visual -->
+<div class="panel" style="padding: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <div>
+            <h3 style="font-size: 16px; margin: 0;">Seus Produtos e Nível de Estoque</h3>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Veja de forma visual quais produtos estão prontos para venda e quais precisam de reposição.</p>
+        </div>
+        <button id="reload-button" class="btn btn-secondary" type="button" onclick="window.location.reload();">
+            ↻ Atualizar Dados
         </button>
-
-        <small id="last-update" style="color: #64748b;">
-            Ainda não atualizado
-        </small>
     </div>
-</div>
-
-    <div id="message" class="message"></div>
 
     <div class="table-wrapper">
-        <table>
+        <table class="table">
             <thead>
                 <tr>
                     <th>Código</th>
-                    <th>Nome</th>
-                    <th>Preço</th>
-                    <th>Estoque</th>
-                    <th>Status</th>
+                    <th>Nome do Produto</th>
+                    <th>Preço de Venda</th>
+                    <th>Qtd. em Estoque</th>
+                    <th>Nível do Estoque</th>
+                    <th>Status do Cadastro</th>
                 </tr>
             </thead>
-            <tbody id="products-table"></tbody>
+            <tbody>
+                {% if products %}
+                    {% for p in products %}
+                        <tr>
+                            <td><strong>{{ p.sku }}</strong></td>
+                            <td>{{ p.name }}</td>
+                            <td>R$ {{ "%.2f"|format(p.price|float)|replace('.', ',') }}</td>
+                            <td><strong>{{ p.stock_quantity }}</strong> unid.</td>
+                            <td style="width: 220px;">
+                                {% if p.stock_quantity == 0 %}
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="flex: 1; height: 8px; background: rgba(239, 68, 68, 0.2); border-radius: 4px; overflow: hidden;">
+                                            <div style="width: 0%; height: 100%; background: var(--danger-text);"></div>
+                                        </div>
+                                        <span class="badge badge-danger">Esgotado</span>
+                                    </div>
+                                {% elif p.stock_quantity <= p.minimum_stock %}
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="flex: 1; height: 8px; background: rgba(245, 158, 11, 0.2); border-radius: 4px; overflow: hidden;">
+                                            <div style="width: 40%; height: 100%; background: var(--warning-text);"></div>
+                                        </div>
+                                        <span class="badge badge-warning">Estoque Baixo</span>
+                                    </div>
+                                {% else %}
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="flex: 1; height: 8px; background: rgba(16, 185, 129, 0.2); border-radius: 4px; overflow: hidden;">
+                                            <div style="width: 100%; height: 100%; background: var(--success-text);"></div>
+                                        </div>
+                                        <span class="badge badge-success">Estoque Ok</span>
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if p.is_active %}
+                                    <span style="color: var(--success-text); font-size: 13px;">Ativo</span>
+                                {% else %}
+                                    <span style="color: var(--text-muted); font-size: 13px;">Inativo</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">Nenhum produto cadastrado até o momento.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
         </table>
     </div>
 </div>
-
-<script>
-    const table = document.getElementById("products-table");
-    const message = document.getElementById("message");
-
-    function showError(text) {
-        message.textContent = text;
-        message.className = "message error";
-    }
-
-    function formatPrice(value) {
-        return Number(value).toLocaleString("pt-BR", {
-            style: "currency",
-            currency: "BRL"
-        });
-    }
-
-    function renderProducts(products) {
-        const active = products.filter(product => product.is_active);
-        const stock = products.reduce(
-            (total, product) => total + Number(product.stock_quantity || 0),
-            0
-        );
-        document.getElementById("total-customers").textContent =
-            "{{ customers|length }}";
- 
-        document.getElementById("total-suppliers").textContent =
-            "{{ suppliers|length }}";
-
-        document.getElementById("total-sales").textContent =
-            "{{ sales|length }}";
-
-        document.getElementById("total-purchases").textContent =
-            "{{ purchases|length }}";
-
-        document.getElementById("total-products").textContent = products.length;
-        document.getElementById("active-products").textContent = active.length;
-        document.getElementById("total-stock").textContent = stock;
-
-        table.innerHTML = products.map(product => `
-            <tr>
-                <td>${product.sku}</td>
-                <td>${product.name}</td>
-                <td>${formatPrice(product.price)}</td>
-                <td>${product.stock_quantity}</td>
-                <td>
-                    <span class="status ${product.is_active ? "active" : "inactive"}">
-                        ${product.is_active ? "Ativo" : "Inativo"}
-                    </span>
-                </td>
-            </tr>
-        `).join("");
-    }
-
-    async function loadProducts() {
-    const button = document.getElementById("reload-button");
-    const lastUpdate = document.getElementById("last-update");
-
-    button.disabled = true;
-    button.textContent = "Atualizando...";
-
-    try {
-        const response = await fetch("/products", {
-            cache: "no-store"
-        });
-
-        if (!response.ok) {
-            throw new Error("Não foi possível carregar os produtos.");
-        }
-
-        const products = await response.json();
-        renderProducts(products);
-
-        const now = new Date().toLocaleTimeString("pt-BR");
-        lastUpdate.textContent = `Atualizado às ${now}`;
-
-        message.textContent = "Dados atualizados com sucesso.";
-        message.className = "message success";
-
-        setTimeout(() => {
-            message.className = "message";
-        }, 2500);
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        button.disabled = false;
-        button.textContent = "↻ Atualizar dados";
-    }
-}
-
-document
-    .getElementById("reload-button")
-    .addEventListener("click", loadProducts);
-
-document.addEventListener("DOMContentLoaded", loadProducts);
-</script>
-
 {% endblock %}

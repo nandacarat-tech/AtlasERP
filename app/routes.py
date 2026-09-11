@@ -223,6 +223,36 @@ def dashboard():
         if purchase.status == "OPEN"
     ]
 
+    # Cálculos Financeiros Didáticos
+    confirmed_sales = [s for s in sales if s.status == CONFIRMED]
+    total_revenue = sum((s.total_amount for s in confirmed_sales), Decimal("0.00"))
+
+    financial_transactions = FinancialTransaction.query.all()
+    expense_transactions = [t for t in financial_transactions if t.transaction_type == "EXPENSE"]
+    total_expenses = sum((t.amount for t in expense_transactions), Decimal("0.00"))
+
+    net_result = total_revenue - total_expenses
+
+    inventory_capital = sum(
+        (Decimal(str(p.stock_quantity)) * p.price for p in products if p.is_active),
+        Decimal("0.00")
+    )
+
+    # Itens de Atenção (Central de Ação do Empreendedor)
+    pending_bills = [t for t in expense_transactions if t.status == "PENDING"]
+    pending_bills_amount = sum((t.amount for t in pending_bills), Decimal("0.00"))
+
+    revenue_transactions = [t for t in financial_transactions if t.transaction_type == "REVENUE"]
+    pending_receivables = [t for t in revenue_transactions if t.status == "PENDING"]
+    pending_receivables_amount = sum((t.amount for t in pending_receivables), Decimal("0.00"))
+
+    pending_invoices_count = Invoice.query.filter_by(status="PENDING_EMISSION").count()
+    pending_returns_count = DeliveryReturn.query.filter_by(status="PENDING_RETURN").count()
+
+    payroll_list = PayrollExpense.query.all()
+    pending_payroll = [p for p in payroll_list if p.status == "PENDING"]
+    pending_payroll_amount = sum((p.total_cost for p in pending_payroll), Decimal("0.00"))
+
     return render_template(
         "index.html",
         products=[product_to_dict(product) for product in products],
@@ -235,6 +265,18 @@ def dashboard():
         inactive_products=inactive_products,
         open_sales=open_sales,
         open_purchases=open_purchases,
+        total_revenue=total_revenue,
+        total_expenses=total_expenses,
+        net_result=net_result,
+        inventory_capital=inventory_capital,
+        pending_bills_count=len(pending_bills),
+        pending_bills_amount=pending_bills_amount,
+        pending_receivables_count=len(pending_receivables),
+        pending_receivables_amount=pending_receivables_amount,
+        pending_invoices_count=pending_invoices_count,
+        pending_returns_count=pending_returns_count,
+        pending_payroll_count=len(pending_payroll),
+        pending_payroll_amount=pending_payroll_amount,
     )
 
 
