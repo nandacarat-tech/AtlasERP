@@ -5,8 +5,8 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h2>Painel Financeiro & Tomada de Decisão</h2>
-        <p style="color: var(--text-muted); font-size: 14px;">Demonstrativo de resultados, fluxo de caixa e estrutura de custos empresariais.</p>
+        <h2>Painel Financeiro & Tomada de Decisão (Visão Integrada ERP)</h2>
+        <p style="color: var(--text-muted); font-size: 14px;">Integração em tempo real entre Estoque, Vendas, Compras, Folha de Pagamento e Lançamentos Financeiros.</p>
     </div>
     <div style="display: flex; gap: 10px;">
         <a href="/ui/financial/transactions" class="btn">+ Novo Lançamento</a>
@@ -17,7 +17,11 @@
 <!-- Cards Estratégicos Financeiros -->
 <div class="cards">
     <div class="card">
-        <h3>Receita Total</h3>
+        <h3>Capital Imobilizado em Estoque</h3>
+        <div class="number" id="total-stock-value" style="color: var(--accent-cyan);">R$ 0,00</div>
+    </div>
+    <div class="card">
+        <h3>Receita Operacional (Vendas)</h3>
         <div class="number" id="total-revenue" style="color: var(--success-text);">R$ 0,00</div>
     </div>
     <div class="card">
@@ -25,44 +29,49 @@
         <div class="number" id="fixed-costs" style="color: var(--warning-text);">R$ 0,00</div>
     </div>
     <div class="card">
-        <h3>Custos Variáveis</h3>
-        <div class="number" id="variable-costs" style="color: var(--warning-text);">R$ 0,00</div>
-    </div>
-    <div class="card">
         <h3>Custos de Pessoal / Folha</h3>
-        <div class="number" id="total-payroll" style="color: var(--accent-cyan);">R$ 0,00</div>
+        <div class="number" id="total-payroll" style="color: #a855f7;">R$ 0,00</div>
     </div>
     <div class="card">
-        <h3>Resultado Líquido</h3>
+        <h3>Resultado Líquido (DRE)</h3>
         <div class="number" id="net-result">R$ 0,00</div>
     </div>
 </div>
 
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
-    <!-- Resumo do Fluxo de Caixa -->
+    <!-- Resumo do Fluxo de Caixa e Previsões -->
     <div class="panel">
-        <h3 style="margin-bottom: 16px; font-size: 16px;">Contas Pendentes de Vencimento</h3>
+        <h3 style="margin-bottom: 16px; font-size: 16px;">Integração Operacional & Projeções de Caixa</h3>
         <table style="width: 100%;">
             <tbody>
                 <tr>
-                    <td><strong>Contas a Pagar (A Vencer):</strong></td>
+                    <td><strong>Entradas Futuras (Vendas a Receber):</strong></td>
+                    <td style="text-align: right; color: var(--success-text); font-weight: 700;" id="pending-receivable">R$ 0,00</td>
+                </tr>
+                <tr>
+                    <td><strong>Saídas Futuras (Compras & Contas a Pagar):</strong></td>
                     <td style="text-align: right; color: var(--danger-text); font-weight: 700;" id="pending-payable">R$ 0,00</td>
                 </tr>
                 <tr>
-                    <td><strong>Contas a Receber (A Vencer):</strong></td>
-                    <td style="text-align: right; color: var(--success-text); font-weight: 700;" id="pending-receivable">R$ 0,00</td>
+                    <td><strong>Compras em Aberto com Fornecedores:</strong></td>
+                    <td style="text-align: right; color: var(--warning-text);" id="open-purchases-total">R$ 0,00</td>
+                </tr>
+                <tr>
+                    <td><strong>Vendas em Aberto a Faturar:</strong></td>
+                    <td style="text-align: right; color: var(--info-text);" id="open-sales-total">R$ 0,00</td>
                 </tr>
             </tbody>
         </table>
     </div>
 
-    <!-- Indicadores de Decisão -->
+    <!-- Indicadores de Inteligência Empresarial -->
     <div class="panel">
-        <h3 style="margin-bottom: 16px; font-size: 16px;">Indicadores de Saúde Financeira</h3>
-        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Com base nos custos cadastrados no AtlasERP:</p>
-        <ul style="list-style: none; display: grid; gap: 8px; font-size: 14px;">
-            <li>✅ <strong>Ponto de Equilíbrio:</strong> Custos Fixos + Pessoal controlados.</li>
-            <li>📊 <strong>Margem Operacional:</strong> Calculada em tempo real com base no faturamento.</li>
+        <h3 style="margin-bottom: 16px; font-size: 16px;">Inteligência de Tomada de Decisão</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Como todos os módulos do AtlasERP se conversam:</p>
+        <ul style="list-style: none; display: grid; gap: 10px; font-size: 14px;">
+            <li>📦 <strong>Estoque x Financeiro:</strong> O saldo em reais dos produtos em prateleira é atualizado automaticamente conforme as compras chegam e vendas saem.</li>
+            <li>🛒 <strong>Vendas x Caixa:</strong> Vendas confirmadas compõem a receita real; vendas em aberto compõem o contas a receber projetado.</li>
+            <li>🏢 <strong>Compras x Fornecedores:</strong> Pedidos de compras abertos geram obrigações de pagamento no contas a pagar.</li>
         </ul>
     </div>
 </div>
@@ -78,12 +87,14 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch('/api/financial/summary')
         .then(response => response.json())
         .then(data => {
+            document.getElementById('total-stock-value').textContent = formatMoney(data.total_stock_value);
             document.getElementById('total-revenue').textContent = formatMoney(data.total_revenue);
             document.getElementById('fixed-costs').textContent = formatMoney(data.fixed_costs);
-            document.getElementById('variable-costs').textContent = formatMoney(data.variable_costs);
             document.getElementById('total-payroll').textContent = formatMoney(data.total_payroll);
             document.getElementById('pending-payable').textContent = formatMoney(data.pending_payable);
             document.getElementById('pending-receivable').textContent = formatMoney(data.pending_receivable);
+            document.getElementById('open-purchases-total').textContent = formatMoney(data.open_purchases_total);
+            document.getElementById('open-sales-total').textContent = formatMoney(data.open_sales_total);
             
             const netRes = parseFloat(data.net_result || 0);
             const netElem = document.getElementById('net-result');

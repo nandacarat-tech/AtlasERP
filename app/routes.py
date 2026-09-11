@@ -1869,20 +1869,41 @@ def get_financial_summary():
     pending_transactions = FinancialTransaction.query.filter_by(status="PENDING").all()
     payrolls = PayrollExpense.query.filter_by(status="ACTIVE").all()
 
-    total_revenue = sum(t.amount for t in transactions if t.transaction_type == "REVENUE")
+    # Integração em tempo real com o Catálogo de Produtos (Estoque)
+    products = Product.query.filter_by(is_active=True).all()
+    total_stock_value = sum(p.stock_quantity * p.price for p in products)
+
+    # Integração em tempo real com o Módulo de Vendas
+    sales_confirmed = Sale.query.filter_by(status=CONFIRMED).all()
+    sales_open = Sale.query.filter_by(status=OPEN).all()
+    confirmed_sales_total = sum(s.total_amount for s in sales_confirmed)
+    open_sales_total = sum(s.total_amount for s in sales_open)
+
+    # Integração em tempo real com o Módulo de Compras (Fornecedores)
+    purchases_open = Purchase.query.filter_by(status="OPEN").all()
+    open_purchases_total = sum(p.total_amount for p in purchases_open)
+
+    # Lançamentos Manuais de Receitas e Despesas
+    manual_revenue = sum(t.amount for t in transactions if t.transaction_type == "REVENUE")
     total_expenses = sum(t.amount for t in transactions if t.transaction_type == "EXPENSE")
     total_payroll = sum(p.total_cost for p in payrolls)
+
+    # Total de Receitas (Vendas Confirmadas + Receitas Manuais)
+    total_revenue = confirmed_sales_total + manual_revenue
 
     fixed_costs = sum(t.amount for t in transactions if t.transaction_type == "EXPENSE" and t.category and t.category.category_type == "FIXED_COST")
     variable_costs = sum(t.amount for t in transactions if t.transaction_type == "EXPENSE" and t.category and t.category.category_type == "VARIABLE_COST")
 
-    pending_payable = sum(t.amount for t in pending_transactions if t.transaction_type == "EXPENSE")
-    pending_receivable = sum(t.amount for t in pending_transactions if t.transaction_type == "REVENUE")
+    # Contas a Pagar (Compras em aberto + Lançamentos Pendentes)
+    pending_payable = sum(t.amount for t in pending_transactions if t.transaction_type == "EXPENSE") + open_purchases_total
+    # Contas a Receber (Vendas em aberto + Lançamentos Pendentes)
+    pending_receivable = sum(t.amount for t in pending_transactions if t.transaction_type == "REVENUE") + open_sales_total
 
     net_result = total_revenue - (total_expenses + total_payroll)
 
     return jsonify({
         "total_revenue": str(total_revenue),
+        "confirmed_sales_total": str(confirmed_sales_total),
         "total_expenses": str(total_expenses),
         "total_payroll": str(total_payroll),
         "total_cost": str(total_expenses + total_payroll),
@@ -1890,6 +1911,9 @@ def get_financial_summary():
         "variable_costs": str(variable_costs),
         "pending_payable": str(pending_payable),
         "pending_receivable": str(pending_receivable),
+        "total_stock_value": str(total_stock_value),
+        "open_purchases_total": str(open_purchases_total),
+        "open_sales_total": str(open_sales_total),
         "net_result": str(net_result),
     })
 
