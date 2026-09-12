@@ -11,3 +11,7 @@ instance/
 *.log
 consulta_testes_flask.txt
 validar supplier_id.txt
+
+# Material de estudo local (Apostilas leigas)
+apostilas/
+learning/
