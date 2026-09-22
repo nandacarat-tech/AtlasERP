@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Área Restrita - Módulo Financeiro - AtlasERP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            background-color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+        }
+        .unlock-card {
+            background: #1e293b;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+            border: 1px solid #334155;
+            color: #f8fafc;
+        }
+        .lock-icon {
+            width: 60px;
+            height: 60px;
+            background: #3b82f620;
+            color: #3b82f6;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px auto;
+            border: 2px solid #3b82f640;
+        }
+        .unlock-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #f8fafc;
+            margin: 0 0 8px 0;
+        }
+        .unlock-subtitle {
+            color: #94a3b8;
+            font-size: 0.88rem;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+        .form-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-bottom: 6px;
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px 14px;
+            background: #0f172a;
+            border: 1px solid #475569;
+            color: white;
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+        .btn-unlock {
+            width: 100%;
+            padding: 12px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-unlock:hover {
+            background: #059669;
+        }
+        .alert-danger {
+            background: #450a0a;
+            color: #fca5a5;
+            border: 1px solid #7f1d1d;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .btn-cancel {
+            display: inline-block;
+            margin-top: 15px;
+            color: #94a3b8;
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+        .btn-cancel:hover {
+            color: #f8fafc;
+        }
+    </style>
+</head>
+<body>
+
+<div class="unlock-card">
+    <div class="lock-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    <h1 class="unlock-title">Módulo Financeiro Protegido</h1>
+    <p class="unlock-subtitle">Por medidas de segurança, informe a senha financeira para liberar a visualização de contas, DRE, folha de pagamento e notas fiscais.</p>
+
+    {% if error %}
+    <div class="alert-danger">
+        ⚠️ {{ error }}
+    </div>
+    {% endif %}
+
+    <form action="/financial/unlock" method="POST">
+        <input type="hidden" name="next" value="{{ next_url or '/ui/financial' }}">
+        
+        <div class="form-group">
+            <label for="financial_password">Senha Financeira de Acesso</label>
+            <input type="password" id="financial_password" name="financial_password" class="form-control" placeholder="••••••••" required autofocus>
+        </div>
+
+        <button type="submit" class="btn-unlock">Desbloquear Módulo Financeiro</button>
+    </form>
+
+    <a href="/dashboard" class="btn-cancel">← Voltar ao Painel Geral</a>
+</div>
+
+</body>
+</html>

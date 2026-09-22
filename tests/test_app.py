@@ -1,4 +1,4 @@
-﻿from app import create_app
+from app import create_app
 
 
 def test_index():
@@ -7,5 +7,6 @@ def test_index():
 
     response = client.get("/")
 
-    assert response.status_code == 200
-    assert response.get_json()["application"] == "AtlasERP"
+    assert response.status_code == 302
+    assert response.location == "/dashboard"
+

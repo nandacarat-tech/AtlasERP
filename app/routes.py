@@ -1,7 +1,9 @@
+from functools import wraps
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, jsonify, request, render_template
+from flask import Blueprint, jsonify, request, render_template, redirect, url_for, session, current_app
+
 
 from app import db
 from app.customer_models import Customer
@@ -186,15 +188,110 @@ def parse_optional_decimal(value, field_name):
         raise ValueError(f"{field_name} deve ser um número válido")
 
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get("user_authenticated"):
+            if request.path.startswith("/api/") or request.is_json:
+                return jsonify({"error": "Autenticação requerida."}), 401
+            return redirect(url_for("main.login", next=request.path))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def financial_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get("user_authenticated"):
+            if request.path.startswith("/api/") or request.is_json:
+                return jsonify({"error": "Autenticação requerida."}), 401
+            return redirect(url_for("main.login", next=request.path))
+            
+        if not session.get("financial_unlocked"):
+            if request.path.startswith("/api/") or request.is_json:
+                return jsonify({"error": "Acesso bloqueado. Senha do módulo financeiro requerida."}), 403
+            return redirect(url_for("main.financial_unlock", next=request.path))
+            
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+# ==========================================
+# ROTAS DE AUTENTICAÇÃO E SEGURANÇA DO ERP
+# ==========================================
+
+@main.get("/login")
+def login():
+    if session.get("user_authenticated"):
+        return redirect(url_for("main.dashboard"))
+    next_url = request.args.get("next", "/dashboard")
+    return render_template("login.html", next_url=next_url)
+
+
+@main.post("/login")
+def process_login():
+    username = str(request.form.get("username", "")).strip()
+    password = str(request.form.get("password", "")).strip()
+    next_url = request.form.get("next", "/dashboard")
+
+    valid_user = current_app.config.get("ERP_ADMIN_USERNAME", "admin")
+    valid_pass = current_app.config.get("ERP_ADMIN_PASSWORD", "admin123")
+
+    if username == valid_user and password == valid_pass:
+        session["user_authenticated"] = True
+        session["username"] = username
+        return redirect(next_url if next_url.startswith("/") else "/dashboard")
+
+    return render_template("login.html", error="Usuário ou senha de acesso incorretos.", next_url=next_url)
+
+
+@main.get("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("main.login"))
+
+
+@main.get("/financial/unlock")
+def financial_unlock():
+    if not session.get("user_authenticated"):
+        return redirect(url_for("main.login", next="/ui/financial"))
+    if session.get("financial_unlocked"):
+        return redirect(url_for("main.financial_page"))
+    next_url = request.args.get("next", "/ui/financial")
+    return render_template("financial_unlock.html", next_url=next_url)
+
+
+@main.post("/financial/unlock")
+def process_financial_unlock():
+    if not session.get("user_authenticated"):
+        return redirect(url_for("main.login"))
+
+    financial_pass = str(request.form.get("financial_password", "")).strip()
+    next_url = request.form.get("next", "/ui/financial")
+    expected_pass = current_app.config.get("FINANCIAL_ACCESS_PASSWORD", "financeiro123")
+
+    if financial_pass == expected_pass:
+        session["financial_unlocked"] = True
+        return redirect(next_url if next_url.startswith("/") else "/ui/financial")
+
+    return render_template("financial_unlock.html", error="Senha do módulo financeiro incorreta.", next_url=next_url)
+
+
+@main.get("/financial/lock")
+def financial_lock():
+    session.pop("financial_unlocked", None)
+    return redirect(url_for("main.dashboard"))
+
+
 @main.get("/")
 def index():
-    return jsonify({
-        "application": "AtlasERP"
-    })
+    return redirect("/dashboard")
 
 
 @main.get("/dashboard")
+@login_required
 def dashboard():
+
     products = Product.query.order_by(Product.id).all()
     customers = Customer.query.order_by(Customer.id).all()
     suppliers = Supplier.query.order_by(Supplier.id).all()
@@ -293,73 +390,88 @@ def dashboard():
 
 
 @main.get("/ui/products")
+@login_required
 def products_page():
     return render_template("products.html")
 
 
 @main.get("/ui/fleet")
+@login_required
 def fleet_page():
     return render_template("fleet.html")
 
 
 @main.get("/ui/fleet/vehicles")
+@login_required
 def fleet_vehicles_page():
     return render_template("fleet_vehicles.html")
 
 
 @main.get("/ui/fleet/maintenances")
+@login_required
 def fleet_maintenances_page():
     return render_template("fleet_maintenances.html")
 
 
 @main.get("/ui/fleet/drivers")
+@login_required
 def fleet_drivers_page():
     return render_template("fleet_drivers.html")
 
 
 @main.get("/ui/fleet/routes")
+@login_required
 def fleet_routes_page():
     return render_template("fleet_routes.html")
 
 
 @main.get("/ui/customers")
+@login_required
 def customers_page():
     return render_template("customers.html")
 
 
 @main.get("/ui/sales")
+@login_required
 def sales_page():
     return render_template("sales.html")
 
 
 @main.get("/ui/suppliers")
+@login_required
 def suppliers_page():
     return render_template("suppliers.html")
 
 
 @main.get("/ui/purchases")
+@login_required
 def purchases_page():
     return render_template("purchases.html")
 
 
 @main.get("/ui/financial")
+@financial_required
 def financial_page():
     return render_template("financial.html")
 
 
 @main.get("/ui/financial/transactions")
+@financial_required
 def financial_transactions_page():
     return render_template("financial_transactions.html")
 
 
 @main.get("/ui/financial/payroll")
+@financial_required
 def financial_payroll_page():
     return render_template("financial_payroll.html")
 
 
 @main.get("/ui/financial/invoices")
+@financial_required
 def financial_invoices_page():
     return render_template("financial_invoices.html")
+
 
 
 @main.get("/products")
