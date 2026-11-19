@@ -1,74 +1,67 @@
-# MemÃ³ria do Projeto: atlas_erp
+# Memória do Projeto: NandaTech / Fernanda Caratanasov
 
-Este documento Ã© a fonte Ãºnica de verdade compartilhada entre todas as conversas e sessÃµes deste projeto no Antigravity.
-
----
-
-## 1. VisÃ£o Geral e Objetivo
-- **Nome do Projeto:** atlas_erp
-- **Objetivo Principal:** [Definir objetivo central do projeto]
-- **PÃºblico / Stakeholders:** [Identificar pÃºblico ou usuÃ¡rios-alvo]
+Este documento é a fonte única de verdade compartilhada entre todas as conversas e sessões deste projeto no Antigravity.
 
 ---
 
-## 2. DecisÃµes Acordadas e Diretrizes Fixadas
-- **PadrÃµes & Estilo:** [Diretrizes de design, tom de voz, regras de cÃ³digo ou arquitetura]
-- **Identidade / Marca:** [Cores, fontes, logos ou formatos definidos]
+## 1. Visão Geral e Objetivo
+- **Nome do Projeto:** NandaTech / Portfólio & Landing Page Corporativa
+- **Objetivo Principal:** Apresentar a NandaTech como hub de engenharia de software corporativa, automação inteligente e DevOps, com destaque principal para o **Atlas ERP** em produção e direcionamento de novos negócios e parcerias técnicas.
+- **Público / Stakeholders:** Clientes corporativos B2B, gestores de tecnologia, recrutadores tech e parceiros de negócios.
 
 ---
 
-## 3. Log de Conversas e SessÃµes
+## 2. Decisões Acordadas e Diretrizes Fixadas
+- **Domínio Principal:** `nandatech.com.br` -> Landing Page Institucional e Vitrine Técnica da NandaTech.
+- **Subdomínio do ERP:** `erpatlas.nandatech.com.br` -> Atlas ERP em produção com SSL no Firebase Hosting conectado ao Cloud Run (`southamerica-east1`).
+- **Padrões de Design:** Identidade visual oficial NandaTech definida com logotipo Minimalista Executivo (monograma N angular em azul marinho e detalhe ascendente em ciano platina).
+- **Visão de Negócios:** Estrutura escalável para múltiplos ERPs verticais MEI sob a marca NandaTech (`erpatlas`, `erpbeauty`, etc.).
+- **Botão de Live Demo:** Destaque de conversão na Landing Page direcionando para `erpatlas.nandatech.com.br`.
 
-### SessÃ£o Inicial (2026-11-02)
-- **TÃ³pico:** InicializaÃ§Ã£o da memÃ³ria contÃ­nua do projeto.
-- **O que foi realizado:** EstruturaÃ§Ã£o do repositÃ³rio de memÃ³ria compartilhada para suportar mÃºltiplas conversas integradas.
-- **PrÃ³ximos Passos:** Registrar novas tarefas e tÃ³picos conforme novas conversas forem iniciadas.
+---
 
-### Sessão de Blindagem de Segurança e Pré-Produção (2026-11-11)
+## 3. Log de Conversas e Sessões
+
+### Sessão Inicial (2026-11-02)
+- **Tópico:** Inicialização da memória contínua do projeto.
+- **O que foi realizado:** Estruturação do repositório de memória compartilhada.
+
+### Sessão de Blindagem de Segurança e Pré-Produção do Atlas ERP (2026-11-11)
 - **Tópico:** Resolução dos apontamentos da auditoria de pré-produção do Atlas ERP.
 - **O que foi realizado:**
-  - Imutabilidade da tabela `audit_logs` garantida em nível de ORM e de `Engine` (interceptador de mutações SQL DML protegendo contra UPDATE/DELETE, preservando DDLs de criação de tabelas).
-  - Rota `/logout` estritamente via POST com retorno de 405 Method Not Allowed para GET.
-  - ProxyFix reconfigurado com granularidade restrita (`x_for=1, x_proto=1`) contra IP spoofing.
-  - Implementação de `EmergencyAdminIdentity` com escopo restrito a recuperação de desastres (`users.*`, `audit.view`) e bloqueio de aprovações financeiras (`financial.approve`).
-  - Remoção de verificação de senhas em texto plano; exigência estrita de hash e política mínima de 12 caracteres.
-  - Preservação de espaços válidos em senhas no login e mitigação de enumeração de contas com resposta padronizada.
-  - Suíte unificada de 162 testes executada com 100% de sucesso tanto em SQLite local quanto em MySQL 9.7 local.
-- **Próximos Passos:** Concluída e aprovada a fase de auditoria de arquitetura e código (162 testes verdes no SQLite e MySQL). Iniciar o ciclo de Homologação (Staging Gate) no GCP Cloud Run com `--no-allow-unauthenticated` e Cloud SQL conforme o roteiro consolidado em `DEPLOY_GCP.md`.
+  - Imutabilidade da tabela `audit_logs` no ORM e Engine SQL.
+  - Rota `/logout` estritamente POST (405 para GET).
+  - ProxyFix configurado (`x_for=1, x_proto=1`) contra IP spoofing.
+  - Implementação de `EmergencyAdminIdentity` com escopo restrito.
+  - Remoção de verificação de senhas em texto plano; política de senhas fortes.
+  - Suíte unificada de 162 testes executada com 100% de sucesso.
 
-### Sessão de Implantação, Produção e Hardening (2026-11-19)
-- **Tópico:** Deploy definitivo no GCP, provisionamento do usuário Admin, povoamento de dados de alta escala (500 clientes e frota massiva), correção de endpoints de frota e registro do domínio de negócio.
+### Sessão de Implantação e Produção (2026-11-19)
+- **Tópico:** Deploy definitivo no GCP Cloud Run (`southamerica-east1`) + Cloud SQL MySQL 8.4 LTS, povoamento de 500 clientes e frota, registro do domínio `nandatech.com.br`.
 - **O que foi realizado:**
-  - Implantação bem-sucedida no Cloud Run (`atlas-erp-534057493749.southamerica-east1.run.app`) e Cloud SQL MySQL 8.4 LTS.
-  - Configuração de políticas de segurança IAM (`allUsers` com `roles/run.invoker`, Service Account `atlaserp-sa`).
-  - Execução bem-sucedida do Job de inicialização RBAC (`atlaserp-seed-auth`) e validação do login do usuário `admin`.
-  - Povoamento massivo de dados (`seed_db.py`):
-    - 500 Clientes reais (250 B2B com CNPJ válido e 250 B2C com CPF válido, múltiplos DDDs e e-mails únicos).
-    - 30 Veículos de frota comercial e pesada (27 operacionais ativos e 3 em manutenção).
-    - 25 Motoristas qualificados com CNHs (B, C, D e E) e 25 rotas de entrega pelo Brasil (15 em andamento `IN_PROGRESS`).
-    - 60 Vendas com itens e 45 Notas Fiscais eletrônicas (NF-e SEFAZ).
-    - 15 Compras de suprimentos, 10 colaboradores na folha de pagamento e lançamentos financeiros (DRE).
-  - Correção no backend (`app/routes.py`):
-    - Filtro do Dashboard ajustado para somar veículos operacionais (`AVAILABLE` e `IN_USE`).
-    - Implementação dos endpoints `/api/fleet/vehicles/summary`, `/api/fleet/drivers/count`, `/api/fleet/routes/active/count` para alimentar dinamicamente os cards de `/ui/fleet`.
-  - Todos os commits e documentações de engenharia de nuvem (`DEPLOY_GCP.md` e `README.md` padrão sênior) sincronizados no GitHub (`nandacarat-tech/AtlasERP`).
-  - **Registro de Domínio:** Registrado com sucesso o domínio **`nandatech.com.br`** no Registro.br.
-  - **Decisão Estratégica de Negócio:**
-    - **`erp.nandatech.com.br`**: Subdomínio dedicado para o Atlas ERP em produção.
-    - **`nandatech.com.br`**: Domínio principal para a Landing Page corporativa da NandaTech / Portfólio Executivo, com vitrine de projetos e botão de Live Demo para o Atlas ERP.
+  - Produção ativa em `https://atlas-erp-534057493749.southamerica-east1.run.app`.
+  - Povoamento massivo de dados reais (clientes, frotas, rotas, NF-e, vendas, compras).
+  - Repositório sincronizado em `https://github.com/nandacarat-tech/AtlasERP`.
+  - Registro de `nandatech.com.br` no Registro.br.
+
+### Sessão Atual — Identidade Visual, Landing Page e Apontamentos DNS (2026-11-19)
+- **Tópico:** Criação do Logotipo Oficial NandaTech, implementação e publicação da nova Landing Page corporativa, apontamento DNS no Registro.br e vinculação ao Firebase Hosting.
+- **O que foi realizado:**
+  - **Identidade Visual:** Criado e aprovado o Logotipo Oficial NandaTech (Minimalista Executivo & Linear), vetorizado em SVG na Navbar e salvo em alta definição (`nandatech_logo.jpg`).
+  - **Landing Page NandaTech:** Desenvolvida e publicada em `nandatech.com.br` via GitHub Pages (`nandacarat-tech/portfolio`) com design B2B premium, vitrine especial do Atlas ERP, alternador Dark/Light e responsividade completa. Testada em `http://localhost:3000`.
+  - **DNS no Registro.br:** Configurada a Zona DNS em Modo Avançado com entradas validadas e respondendo ativamente:
+    - CNAME `erpatlas` -> `atlas-erp-73956.web.app` (Atlas ERP).
+    - Registros A (4 IPs) e CNAME `www` -> GitHub Pages (Landing Page).
+  - **Modo Demonstração (Live Demo de 1 Clique) & Proteção Anti-Sabotagem (Opção 1 + 3):**
+    - Adicionado botão de destaque "⚡ Entrar com 1 Clique (Demonstração)" em `login.html`.
+    - Adicionado suporte a credenciais demo universais (`admin` / `demo`) com preenchimento em 1 clique via chips interativos.
+    - Implementado endpoint dedicado `/login/demo` com criação imediata de sessão de Administrador e rastreamento em trilha de auditoria.
+    - Implementado desbloqueio em 1 clique para o Módulo Financeiro (`/financial/unlock/demo`) e suporte à senha `demo`.
+    - Exibição de indicador de status no cabeçalho do ERP: `🟢 Modo Demonstração • Vitrine NandaTech`.
+    - **Proteção Anti-Sabotagem da Vitrine:** Blindagem em `app/routes.py` para impedir que visitantes em sessão demo excluam o acervo original semeado (clientes, produtos base, motoristas, rotas e lançamentos financeiros). Novos cadastros criados pelos visitantes podem ser excluídos normalmente.
+    - Suíte de 166 testes automatizados executada e 100% aprovada (`166 passed`).
+    - Commits e push realizados com sucesso em `nandacarat-tech/AtlasERP`.
 
 ---
 
-## 4. Estado Atual e Próximos Passos para a Próxima Sessão (Domínio & Landing Page)
-
-- **Repositório GitHub:** `https://github.com/nandacarat-tech/AtlasERP` (Branch `main` atualizada).
-- **Ambiente de Produção Atual:** `https://atlas-erp-534057493749.southamerica-east1.run.app`
-- **Domínio Registrado:** `nandatech.com.br`
-- **Tarefas para a Próxima Sessão:**
-  1. Concluir o apontamento DNS de `erp.nandatech.com.br` no Registro.br (CNAME `erp` para `ghs.googlehosted.com.`) e validação SSL.
-  2. Desenhar e implementar a **Landing Page Profissional NandaTech** para o domínio raiz `nandatech.com.br`, com foco de negócio/portfólio, destaque para o Atlas ERP e estrutura expansível para futuros projetos.
-
-
-
----
 
