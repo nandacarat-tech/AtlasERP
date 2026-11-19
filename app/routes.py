@@ -1581,6 +1581,7 @@ def fleet_vehicle_to_dict(vehicle):
 
 
 @main.get("/fleet/vehicles")
+@main.get("/api/fleet/vehicles")
 def list_fleet_vehicles():
     vehicles = FleetVehicle.query.order_by(FleetVehicle.id.desc()).all()
 
@@ -1668,6 +1669,7 @@ def create_fleet_vehicle():
 
 
 @main.get("/fleet/maintenances")
+@main.get("/api/fleet/maintenances")
 def list_fleet_maintenances():
     vehicle_id = request.args.get("vehicle_id", type=int)
     status = request.args.get("status")
@@ -1858,6 +1860,7 @@ def route_to_dict(route):
 
 
 @main.get("/fleet/drivers")
+@main.get("/api/fleet/drivers")
 def list_fleet_drivers():
     drivers = Driver.query.order_by(Driver.id.desc()).all()
     return jsonify([driver.to_dict() for driver in drivers])
@@ -2044,6 +2047,7 @@ ROUTE_STATUSES = {
 
 
 @main.get("/fleet/routes")
+@main.get("/api/fleet/routes")
 def list_fleet_routes():
     routes = Route.query.order_by(Route.start_date.desc(), Route.id.desc()).all()
     return jsonify([route.to_dict() for route in routes])
@@ -2642,6 +2646,36 @@ def get_fleet_returns_summary():
         "rescheduled": rescheduled,
         "cancelled": cancelled,
     })
+
+
+@main.get("/api/fleet/vehicles/summary")
+def get_fleet_vehicles_summary():
+    available = FleetVehicle.query.filter_by(status="AVAILABLE").count()
+    in_use = FleetVehicle.query.filter_by(status="IN_USE").count()
+    maintenance = FleetVehicle.query.filter_by(status="MAINTENANCE").count()
+    inactive = FleetVehicle.query.filter_by(status="INACTIVE").count()
+    total = FleetVehicle.query.count()
+
+    return jsonify({
+        "available": available,
+        "in_use": in_use,
+        "maintenance": maintenance,
+        "inactive": inactive,
+        "total": total,
+    })
+
+
+@main.get("/api/fleet/drivers/count")
+def get_fleet_drivers_count():
+    total = Driver.query.filter_by(status="ACTIVE").count()
+    return jsonify({"total": total})
+
+
+@main.get("/api/fleet/routes/active/count")
+def get_fleet_active_routes_count():
+    total = Route.query.filter_by(status="IN_PROGRESS").count()
+    return jsonify({"total": total})
+
 
 
 
