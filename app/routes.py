@@ -428,7 +428,9 @@ def dashboard():
     pending_payroll = [p for p in payroll_list if p.status == "PENDING"]
     pending_payroll_amount = sum((p.total_cost for p in pending_payroll), Decimal("0.00"))
 
-    active_vehicles_count = FleetVehicle.query.filter_by(status="ACTIVE").count()
+    active_vehicles_count = FleetVehicle.query.filter(
+        FleetVehicle.status.in_(["AVAILABLE", "IN_USE"])
+    ).count()
     routes_in_progress_count = Route.query.filter_by(status="IN_PROGRESS").count()
     recent_sales = [sale_to_dict(s, include_names=True) for s in Sale.query.order_by(Sale.id.desc()).limit(5).all()]
 
