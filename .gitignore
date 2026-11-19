@@ -1,4 +1,4 @@
-﻿# Ambientes virtuais
+# Ambientes virtuais
 .venv/
 venv/
 ENV/
@@ -30,3 +30,4 @@ consulta_testes_flask.txt
 apostilas/
 learning/
 *.bat
+.firebase/

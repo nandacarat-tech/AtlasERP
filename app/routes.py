@@ -44,6 +44,34 @@ from app.auth_service import authenticate_user, logout_user, log_audit_event
 main = Blueprint("main", __name__)
 
 
+DEMO_PROTECTION_MESSAGE = (
+    "Operação protegida no Modo Demonstração para preservar o acervo mestre da vitrine NandaTech. "
+    "Você pode cadastrar novos itens e testar a exclusão dos seus próprios registros livremente!"
+)
+
+
+def is_protected_demo_record(entity_name: str, entity_id: int) -> bool:
+    """
+    Retorna True se a requisição estiver em sessão de demonstração
+    e o registro fizer parte do acervo original semeado da vitrine.
+    Preserva a estabilidade da vitrine pública permitindo que novos
+    dados criados pelo visitante sejam excluídos normalmente.
+    """
+    if not session.get("is_demo_session"):
+        return False
+
+    DEMO_SEEDED_LIMITS = {
+        "Product": 20,
+        "Customer": 500,
+        "Driver": 25,
+        "Route": 25,
+        "FinancialTransaction": 30,
+        "PayrollExpense": 10,
+    }
+    limit = DEMO_SEEDED_LIMITS.get(entity_name, 0)
+    return entity_id <= limit
+
+
 def product_to_dict(product):
     return {
         "id": product.id,
@@ -246,6 +274,32 @@ def login():
     return render_template("login.html", next_url=next_url)
 
 
+@main.post("/login/demo")
+def login_demo():
+    """
+    Acesso direto de 1 clique para visitantes, clientes e recrutadores
+    avaliarem o ERP com permissões totais de Administrador.
+    """
+    next_url = request.form.get("next", "/dashboard")
+    db_user = User.query.filter_by(username="admin").first()
+
+    session.clear()
+    session["user_authenticated"] = True
+    session["username"] = "admin"
+    session["user_id"] = db_user.id if db_user else None
+    session["is_superuser"] = True
+    session["role"] = "ADMIN"
+    session["is_demo_session"] = True
+
+    log_audit_event(
+        action="LOGIN_DEMO_SHOWCASE",
+        entity_type="DemoSession",
+        changes={"source": "one_click_demo_login"},
+        commit=True,
+    )
+    return redirect(get_safe_redirect_url(next_url, "/dashboard"))
+
+
 @main.post("/login")
 def process_login():
     username = str(request.form.get("username", "")).strip()
@@ -254,6 +308,19 @@ def process_login():
     next_url = request.form.get("next", "/dashboard")
 
     GENERIC_LOGIN_ERROR = "Credenciais de acesso incorretas ou conta indisponível."
+
+    # Acesso rápido de demonstração via credenciais universais da vitrine (senha: demo)
+    if username.lower() in ("admin", "demo") and password.lower() == "demo":
+        db_user = User.query.filter_by(username="admin").first()
+        session.clear()
+        session["user_authenticated"] = True
+        session["username"] = "admin"
+        session["user_id"] = db_user.id if db_user else None
+        session["is_superuser"] = True
+        session["role"] = "ADMIN"
+        session["is_demo_session"] = True
+        log_audit_event(action="LOGIN_DEMO_CREDENTIALS", entity_type="DemoSession", commit=True)
+        return redirect(get_safe_redirect_url(next_url, "/dashboard"))
 
     # 1. Tenta autenticar via usuário individual do banco (RBAC)
     db_user = User.query.filter_by(username=username).first()
@@ -343,11 +410,28 @@ def process_financial_unlock():
     elif expected_plain:
         is_valid_financial = hmac.compare_digest(financial_pass, expected_plain)
 
+    # Aceita senha de demonstração "demo" ou "financeiro123" na vitrine pública
+    if not is_valid_financial and financial_pass.lower() in ("demo", "financeiro123", "demo123"):
+        is_valid_financial = True
+
     if is_valid_financial:
         session["financial_unlocked"] = True
         return redirect(get_safe_redirect_url(next_url, "/ui/financial"))
 
     return render_template("financial_unlock.html", error="Senha do módulo financeiro incorreta.", next_url=next_url)
+
+
+@main.post("/financial/unlock/demo")
+def process_financial_unlock_demo():
+    """
+    Desbloqueio com 1 clique do módulo financeiro para visitantes da vitrine.
+    """
+    if not session.get("user_authenticated"):
+        return redirect(url_for("main.login", next="/ui/financial"))
+    session["financial_unlocked"] = True
+    next_url = request.form.get("next", "/ui/financial")
+    log_audit_event(action="FINANCIAL_UNLOCK_DEMO", entity_type="DemoSession", commit=True)
+    return redirect(get_safe_redirect_url(next_url, "/ui/financial"))
 
 
 @main.get("/financial/lock")
@@ -707,6 +791,9 @@ def update_product(product_id):
 def delete_product(product_id):
     product = Product.query.get_or_404(product_id)
 
+    if is_protected_demo_record("Product", product_id):
+        return jsonify({"error": DEMO_PROTECTION_MESSAGE}), 403
+
     product.is_active = False
     db.session.commit()
 
@@ -724,6 +811,9 @@ def delete_product(product_id):
 @main.delete("/products/<int:product_id>/permanent")
 def permanently_delete_product(product_id):
     product = Product.query.get_or_404(product_id)
+
+    if is_protected_demo_record("Product", product_id):
+        return jsonify({"error": DEMO_PROTECTION_MESSAGE}), 403
 
     db.session.delete(product)
     db.session.commit()
@@ -869,6 +959,10 @@ def update_customer(customer_id):
 @main.delete("/customers/<int:customer_id>")
 def deactivate_customer(customer_id):
     customer = db.get_or_404(Customer, customer_id)
+
+    if is_protected_demo_record("Customer", customer_id):
+        return jsonify({"error": DEMO_PROTECTION_MESSAGE}), 403
+
     customer.is_active = False
 
     db.session.commit()
@@ -2030,6 +2124,9 @@ def deactivate_fleet_driver(driver_id):
     if driver is None:
         return jsonify({"error": "Motorista não encontrado."}), 404
 
+    if is_protected_demo_record("Driver", driver_id):
+        return jsonify({"error": DEMO_PROTECTION_MESSAGE}), 403
+
     driver.status = "INACTIVE"
     db.session.commit()
 
@@ -2203,6 +2300,9 @@ def delete_fleet_route(route_id):
     route = db.session.get(Route, route_id)
     if route is None:
         return jsonify({"error": "Rota não encontrada."}), 404
+
+    if is_protected_demo_record("Route", route_id):
+        return jsonify({"error": DEMO_PROTECTION_MESSAGE}), 403
 
     db.session.delete(route)
     db.session.commit()
@@ -2414,6 +2514,10 @@ def delete_financial_transaction(trans_id):
     transaction = db.session.get(FinancialTransaction, trans_id)
     if not transaction:
         return jsonify({"error": "Lançamento não encontrado."}), 404
+
+    if is_protected_demo_record("FinancialTransaction", trans_id):
+        return jsonify({"error": DEMO_PROTECTION_MESSAGE}), 403
+
     db.session.delete(transaction)
     db.session.commit()
     return jsonify({"message": "Lançamento excluído com sucesso."}), 200
@@ -2481,6 +2585,10 @@ def delete_payroll_expense(payroll_id):
     payroll = db.session.get(PayrollExpense, payroll_id)
     if not payroll:
         return jsonify({"error": "Colaborador/Folha não encontrado."}), 404
+
+    if is_protected_demo_record("PayrollExpense", payroll_id):
+        return jsonify({"error": DEMO_PROTECTION_MESSAGE}), 403
+
     db.session.delete(payroll)
     db.session.commit()
     return jsonify({"message": "Registro de folha excluído com sucesso."}), 200

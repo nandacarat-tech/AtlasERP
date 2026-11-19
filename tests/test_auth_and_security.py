@@ -120,3 +120,96 @@ def test_session_fixation_clearing_on_login(client):
         assert sess.get("user_authenticated") is True
         assert sess.get("username") == "admin"
 
+
+def test_one_click_demo_login(client):
+    """
+    Testa o fluxo de acesso em 1 clique (Live Demo) para visitantes e recrutadores.
+    """
+    response = client.post("/login/demo", follow_redirects=True)
+    assert response.status_code == 200
+    assert "Modo Demonstração" in response.get_data(as_text=True)
+
+    with client.session_transaction() as sess:
+        assert sess.get("user_authenticated") is True
+        assert sess.get("username") == "admin"
+        assert sess.get("is_superuser") is True
+        assert sess.get("is_demo_session") is True
+
+
+def test_login_with_demo_credentials(client):
+    """
+    Testa o login convencional preenchendo as credenciais de demonstração (admin / demo).
+    """
+    response = client.post("/login", data={
+        "username": "admin",
+        "password": "demo"
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert "Modo Demonstração" in response.get_data(as_text=True)
+
+    with client.session_transaction() as sess:
+        assert sess.get("user_authenticated") is True
+        assert sess.get("is_demo_session") is True
+
+
+def test_financial_unlock_demo_and_password(client):
+    """
+    Garante que visitantes podem desbloquear o módulo financeiro com 1 clique
+    ou informando a senha 'demo'.
+    """
+    # 1. Faz login no sistema
+    client.post("/login/demo")
+
+    # 2. Desbloqueia com 1 clique (/financial/unlock/demo)
+    res_unlock_demo = client.post("/financial/unlock/demo", follow_redirects=True)
+    assert res_unlock_demo.status_code == 200
+    with client.session_transaction() as sess:
+        assert sess.get("financial_unlocked") is True
+
+    # 3. Bloqueia novamente
+    client.get("/financial/lock")
+    with client.session_transaction() as sess:
+        assert sess.get("financial_unlocked") is None
+
+    # 4. Desbloqueia via formulário com a senha "demo"
+    res_unlock_pass = client.post("/financial/unlock", data={"financial_password": "demo"}, follow_redirects=True)
+    assert res_unlock_pass.status_code == 200
+    with client.session_transaction() as sess:
+        assert sess.get("financial_unlocked") is True
+
+
+def test_demo_mode_anti_sabotage_protection(client, app):
+    """
+    Garante a regra de blindagem: visitantes em modo demonstração não podem
+    excluir itens do catálogo mestre original semeado (evitando corrupção da vitrine),
+    mas podem criar novos registros e excluí-los livremente.
+    """
+    from app import db
+    from app.models import Product
+
+    with app.app_context():
+        # Produto base do catálogo (ID 1)
+        p_base = Product(id=1, sku="BASE-PROD", name="Produto Base", price="100.00", is_active=True)
+        # Produto criado por um visitante (ID 999)
+        p_novo = Product(id=999, sku="VISITOR-PROD", name="Produto Visitante", price="50.00", is_active=True)
+        db.session.add_all([p_base, p_novo])
+        db.session.commit()
+
+    # 1. Em sessão de demonstração
+    with client.session_transaction() as sess:
+        sess["user_authenticated"] = True
+        sess["username"] = "admin"
+        sess["is_demo_session"] = True
+
+    # Tentativa de exclusão do produto base semeado (ID 1) -> Bloqueado com 403
+    res_del_base = client.delete("/products/1")
+    assert res_del_base.status_code == 403
+    assert "Modo Demonstração" in res_del_base.get_json()["error"]
+
+    res_del_perm = client.delete("/products/1/permanent")
+    assert res_del_perm.status_code == 403
+
+    # Exclusão do produto criado por visitante (ID 999) -> Permitido normalmente
+    res_del_novo = client.delete("/products/999")
+    assert res_del_novo.status_code == 200
+

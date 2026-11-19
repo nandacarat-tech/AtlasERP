@@ -20,49 +20,136 @@
         }
         .login-card {
             background: white;
-            padding: 40px;
+            padding: 36px 32px;
             border-radius: 16px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+            border: 1px solid #e2e8f0;
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
             text-align: center;
+            box-sizing: border-box;
         }
         .login-logo {
-            width: 70px;
-            height: 70px;
+            width: 68px;
+            height: 68px;
             border-radius: 50%;
             object-fit: cover;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 2px solid #e2e8f0;
         }
         .login-title {
-            font-size: 1.6rem;
+            font-size: 1.55rem;
             font-weight: 800;
             color: #0f172a;
-            margin: 0 0 5px 0;
+            margin: 0 0 4px 0;
+            letter-spacing: -0.02em;
         }
         .login-subtitle {
             color: #64748b;
-            font-size: 0.9rem;
-            margin-bottom: 25px;
+            font-size: 0.88rem;
+            margin-bottom: 22px;
+            line-height: 1.4;
         }
+
+        /* Card de Acesso Rápido - Modo Demonstração */
+        .demo-box {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-left: 4px solid #2563eb;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+            text-align: left;
+        }
+        .demo-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        .demo-badge {
+            background: #dbeafe;
+            color: #1e40af;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .demo-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .demo-desc {
+            font-size: 0.8rem;
+            color: #475569;
+            margin: 0 0 12px 0;
+            line-height: 1.45;
+        }
+        .btn-demo {
+            width: 100%;
+            padding: 11px 14px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+        }
+        .btn-demo:hover {
+            background: #1d4ed8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+        }
+
+        /* Divisor Visual */
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 20px 0;
+            color: #94a3b8;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .divider span {
+            padding: 0 10px;
+        }
+
         .form-group {
             text-align: left;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
         .form-group label {
             display: block;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             font-weight: 600;
             color: #334155;
-            margin-bottom: 6px;
+            margin-bottom: 5px;
         }
         .form-control {
             width: 100%;
-            padding: 12px 14px;
+            padding: 10px 12px;
             border: 1px solid #cbd5e1;
             border-radius: 8px;
-            font-size: 0.95rem;
+            font-size: 0.92rem;
             box-sizing: border-box;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
@@ -73,19 +160,46 @@
         }
         .btn-login {
             width: 100%;
-            padding: 12px;
-            background: #2563eb;
+            padding: 11px;
+            background: #0f172a;
             color: white;
             border: none;
             border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 700;
+            font-size: 0.95rem;
+            font-weight: 600;
             cursor: pointer;
             transition: background 0.2s;
+            margin-top: 6px;
         }
         .btn-login:hover {
-            background: #1d4ed8;
+            background: #1e293b;
         }
+
+        /* Micro-chips de Credenciais */
+        .credential-hints {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 14px;
+            font-size: 0.76rem;
+            color: #64748b;
+        }
+        .chip {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 3px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 0.78rem;
+            color: #334155;
+            transition: all 0.15s ease;
+        }
+        .chip:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
         .alert-danger {
             background: #fef2f2;
             color: #991b1b;
@@ -93,13 +207,14 @@
             padding: 10px 14px;
             border-radius: 8px;
             font-size: 0.85rem;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
             text-align: left;
         }
         .login-footer {
-            margin-top: 25px;
-            font-size: 0.8rem;
+            margin-top: 24px;
+            font-size: 0.76rem;
             color: #94a3b8;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -108,7 +223,7 @@
 <div class="login-card">
     <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="Logo AtlasERP" class="login-logo">
     <h1 class="login-title">AtlasERP</h1>
-    <p class="login-subtitle">Digite suas credenciais para acessar o sistema</p>
+    <p class="login-subtitle">Gestão Integrada em Nuvem para Empresas & MEI</p>
 
     {% if error %}
     <div class="alert-danger">
@@ -116,7 +231,28 @@
     </div>
     {% endif %}
 
-    <form action="/login" method="POST">
+    <!-- Bloco de Acesso Rápido - Modo Demonstração -->
+    <div class="demo-box">
+        <div class="demo-header">
+            <span class="demo-title">⚡ Acesso Demonstração</span>
+            <span class="demo-badge">Vitrine Live</span>
+        </div>
+        <p class="demo-desc">Explore o ERP em tempo real com permissões completas de Administrador (DRE, vendas, estoque e frota).</p>
+        <form action="/login/demo" method="POST" style="margin: 0;">
+            <input type="hidden" name="next" value="{{ next_url or '/dashboard' }}">
+            <button type="submit" class="btn-demo">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Entrar com 1 Clique (Demonstração)
+            </button>
+        </form>
+    </div>
+
+    <div class="divider">
+        <span>ou acesse manualmente</span>
+    </div>
+
+    <!-- Formulário Padrão -->
+    <form action="/login" method="POST" id="loginForm">
         <input type="hidden" name="next" value="{{ next_url or '/dashboard' }}">
         
         <div class="form-group">
@@ -130,12 +266,26 @@
         </div>
 
         <button type="submit" class="btn-login">Entrar no Sistema</button>
+
+        <div class="credential-hints">
+            <span>Dica Demo:</span>
+            <span class="chip" onclick="fillCredentials('admin', 'demo')" title="Clique para preencher e entrar">admin / demo</span>
+        </div>
     </form>
 
     <div class="login-footer">
-        AtlasERP &copy; 2026 • Protegido por NandaTech Security
+        AtlasERP &copy; 2026 • NandaTech Engenharia de Software<br>
+        Ambiente seguro com criptografia e trilha de auditoria
     </div>
 </div>
+
+<script>
+function fillCredentials(user, pass) {
+    document.getElementById('username').value = user;
+    document.getElementById('password').value = pass;
+    document.getElementById('loginForm').submit();
+}
+</script>
 
 </body>
 </html>
