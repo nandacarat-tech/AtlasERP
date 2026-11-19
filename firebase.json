@@ -1,0 +1,1 @@
+{"hosting":{"public":"public_firebase","ignore":["firebase.json","**/.*","**/node_modules/**"],"rewrites":[{"source":"**","run":{"serviceId":"atlas-erp","region":"southamerica-east1"}}]}}
