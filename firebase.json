@@ -1,1 +1,1 @@
-{"hosting":{"public":"public_firebase","ignore":["firebase.json","**/.*","**/node_modules/**"],"rewrites":[{"source":"**","run":{"serviceId":"atlas-erp","region":"southamerica-east1"}}]}}
+{"hosting":{"public":"public_firebase","ignore":["firebase.json","**/.*","**/node_modules/**"],"redirects":[{"source":"/:path*","destination":"https://atlas-erp-534057493749.southamerica-east1.run.app/:path*","type":302}]}}
