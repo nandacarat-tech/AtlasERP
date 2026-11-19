@@ -1,8 +1,11 @@
+import hmac
 from functools import wraps
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, jsonify, request, render_template, redirect, url_for, session, current_app
+from werkzeug.security import check_password_hash
+
 
 
 from app import db
@@ -34,6 +37,8 @@ from app.purchase_service import (
     receive_purchase,
 )
 from app.purchase_status import PURCHASE_STATUSES
+from app.auth_models import User
+from app.auth_service import authenticate_user, logout_user, log_audit_event
 
 
 main = Blueprint("main", __name__)
@@ -220,6 +225,19 @@ def financial_required(f):
 # ROTAS DE AUTENTICAÇÃO E SEGURANÇA DO ERP
 # ==========================================
 
+def get_safe_redirect_url(target_url, default_url="/dashboard"):
+    """
+    Previne vulnerabilidade de Open Redirect garantindo que o redirecionamento
+    seja estritamente relativo ao domínio atual.
+    """
+    if not target_url or not isinstance(target_url, str):
+        return default_url
+    target_url = target_url.strip()
+    if target_url.startswith("/") and not target_url.startswith("//") and "\\" not in target_url:
+        return target_url
+    return default_url
+
+
 @main.get("/login")
 def login():
     if session.get("user_authenticated"):
@@ -231,23 +249,68 @@ def login():
 @main.post("/login")
 def process_login():
     username = str(request.form.get("username", "")).strip()
-    password = str(request.form.get("password", "")).strip()
+    # Preserva rigorosamente os caracteres da senha digitada (sem .strip())
+    password = str(request.form.get("password", ""))
     next_url = request.form.get("next", "/dashboard")
 
+    GENERIC_LOGIN_ERROR = "Credenciais de acesso incorretas ou conta indisponível."
+
+    # 1. Tenta autenticar via usuário individual do banco (RBAC)
+    db_user = User.query.filter_by(username=username).first()
+    if db_user:
+        success, result = authenticate_user(username, password)
+        if success:
+            return redirect(get_safe_redirect_url(next_url, "/dashboard"))
+        return render_template("login.html", error=GENERIC_LOGIN_ERROR, next_url=next_url)
+
+    # 2. Se não existir no banco de dados, verifica credenciais de acesso emergencial (Break-Glass)
+    is_emergency_enabled = current_app.config.get("ERP_EMERGENCY_ADMIN_ENABLED", False)
     valid_user = current_app.config.get("ERP_ADMIN_USERNAME", "admin")
-    valid_pass = current_app.config.get("ERP_ADMIN_PASSWORD", "admin123")
+    password_hash = current_app.config.get("ERP_ADMIN_PASSWORD_HASH")
 
-    if username == valid_user and password == valid_pass:
-        session["user_authenticated"] = True
-        session["username"] = username
-        return redirect(next_url if next_url.startswith("/") else "/dashboard")
+    is_valid_user = hmac.compare_digest(username, valid_user)
+    if is_valid_user and not is_emergency_enabled:
+        log_audit_event(
+            action="DISABLED_EMERGENCY_ADMIN_ATTEMPT",
+            entity_type="ConfigAdmin",
+            changes={"reason": "Conta emergencial desativada por configuracao", "attempted": username},
+            commit=True,
+        )
+        return render_template("login.html", error="Acesso emergencial desativado nesta instancia.", next_url=next_url)
 
-    return render_template("login.html", error="Usuário ou senha de acesso incorretos.", next_url=next_url)
+    is_valid_pass = False
+    if is_valid_user and is_emergency_enabled and password_hash:
+        try:
+            is_valid_pass = check_password_hash(password_hash, password)
+        except Exception:
+            is_valid_pass = False
+
+        if is_valid_pass:
+            session.clear()
+            session["user_authenticated"] = True
+            session["username"] = username
+            session["user_id"] = None
+            session["is_emergency_admin"] = True
+            session["is_superuser"] = False  # Nao e superuser generico, e uma EmergencyAdminIdentity com escopo restrito
+            log_audit_event(action="LOGIN_EMERGENCY_ADMIN", entity_type="ConfigAdmin", commit=True)
+            return redirect(get_safe_redirect_url(next_url, "/dashboard"))
+
+    log_audit_event(
+        action="FAILED_LOGIN",
+        entity_type="User",
+        entity_id=None,
+        changes={"reason": "Usuario inexistente", "attempted": username},
+        commit=True,
+    )
+    return render_template("login.html", error=GENERIC_LOGIN_ERROR, next_url=next_url)
 
 
-@main.get("/logout")
+@main.post("/logout")
 def logout():
-    session.clear()
+    """
+    Encerramento de sessão seguro restrito a requisições HTTP POST.
+    """
+    logout_user()
     return redirect(url_for("main.login"))
 
 
@@ -268,11 +331,21 @@ def process_financial_unlock():
 
     financial_pass = str(request.form.get("financial_password", "")).strip()
     next_url = request.form.get("next", "/ui/financial")
-    expected_pass = current_app.config.get("FINANCIAL_ACCESS_PASSWORD", "financeiro123")
+    expected_hash = current_app.config.get("FINANCIAL_ACCESS_PASSWORD_HASH")
+    expected_plain = current_app.config.get("FINANCIAL_ACCESS_PASSWORD")
 
-    if financial_pass == expected_pass:
+    is_valid_financial = False
+    if expected_hash:
+        try:
+            is_valid_financial = check_password_hash(expected_hash, financial_pass)
+        except Exception:
+            is_valid_financial = False
+    elif expected_plain:
+        is_valid_financial = hmac.compare_digest(financial_pass, expected_plain)
+
+    if is_valid_financial:
         session["financial_unlocked"] = True
-        return redirect(next_url if next_url.startswith("/") else "/ui/financial")
+        return redirect(get_safe_redirect_url(next_url, "/ui/financial"))
 
     return render_template("financial_unlock.html", error="Senha do módulo financeiro incorreta.", next_url=next_url)
 

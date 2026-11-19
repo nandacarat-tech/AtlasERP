@@ -1,0 +1,44 @@
+﻿# Git e controle de versao
+.git
+.gitignore
+
+# Ambientes virtuais e pacotes locais
+.venv
+venv/
+ENV/
+
+# Python cache e bytecode
+__pycache__
+*.py[cod]
+*$py.class
+.pytest_cache
+
+# Variaveis de ambiente e segredos locais
+.env
+.env.*
+!.env.example
+
+# Bancos de dados locais e backups
+instance/
+*.db
+*.db.bak
+*.sqlite3
+*.sql
+*.dump
+
+# Testes automatizados (nao necessarios na imagem de producao)
+tests/
+
+# Documentacoes internas, estudos e apostilas
+apostilas/
+docs/
+interview/
+learning/
+learning_*.txt
+*.bat
+DEPLOY_GCP.md
+validar supplier_id.txt
+consulta_testes_flask.txt
+
+# Protecao explicita para NUNCA ignorar requirements.txt
+!requirements.txt

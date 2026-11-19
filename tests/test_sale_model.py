@@ -7,11 +7,8 @@ from app.models import Product
 from app.sale_models import Sale, SaleItem
 
 
-def test_sale_calculates_total():
-    app = create_app(TestingConfig)
-
+def test_sale_calculates_total(app):
     with app.app_context():
-        db.create_all()
 
         customer = Customer(
             document="52998224725",

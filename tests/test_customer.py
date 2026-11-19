@@ -3,11 +3,8 @@ from app.config import TestingConfig
 from app.customer_models import Customer
 
 
-def test_create_customer():
-    app = create_app(TestingConfig)
-
+def test_create_customer(app):
     with app.app_context():
-        db.create_all()
 
         customer = Customer(
             document="52998224725",

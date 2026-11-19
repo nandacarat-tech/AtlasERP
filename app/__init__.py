@@ -42,10 +42,18 @@ def create_app(config_object=None):
     from app import purchase_models
     from app import supplier_models
     from app import financial_models
+    from app import auth_models
+    from app import audit_models
 
     # Agora que os modelos foram carregados e registrados, podemos importar as rotas.
     from app.routes import main
 
     app.register_blueprint(main, url_prefix='/')
+
+    # Configuracao de Proxy Reverso Confiável (Google Cloud Run / Load Balancer)
+    # Impede que clientes forjem o IP real atraves de cabecalhos X-Forwarded-For arbitrarios
+    if app.config.get("USE_PROXY_FIX", False) or app.config.get("IS_PRODUCTION", False):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
     return app

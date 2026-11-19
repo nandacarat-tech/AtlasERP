@@ -1,0 +1,32 @@
+﻿# Ambientes virtuais
+.venv/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Variaveis de ambiente
+.env
+.env.*
+!.env.example
+
+# Banco de dados SQLite local e backups
+instance/
+*.db
+*.db.bak
+*.sqlite3
+*.sql
+*.dump
+
+# Arquivos de log e testes locais
+*.log
+validar supplier_id.txt
+consulta_testes_flask.txt
+
+apostilas/
+learning/
+*.bat

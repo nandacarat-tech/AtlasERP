@@ -1,0 +1,48 @@
+﻿# Git e controle de versao
+.git/
+.gitignore
+
+# Ambientes virtuais
+.venv/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Segredos locais e variaveis
+.env
+.env.*
+!.env.example
+
+# Bancos de dados locais e backups
+instance/
+*.db
+*.db.bak
+*.sqlite3
+*.sql
+*.dump
+
+# Testes e documentacoes
+tests/
+apostilas/
+docs/
+interview/
+learning/
+learning_*.txt
+*.bat
+DEPLOY_GCP.md
+validar supplier_id.txt
+consulta_testes_flask.txt
+
+# Arquivos essenciais para o build do container
+!Dockerfile
+!.dockerignore
+!requirements.txt
+!run.py
+!app/**
+!migrations/**
+!static/**

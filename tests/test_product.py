@@ -1,16 +1,12 @@
-﻿from decimal import Decimal
+from decimal import Decimal
 
 from app import create_app, db
 from app.config import TestingConfig
 from app.models import Product
 
 
-def test_create_product():
-    app = create_app(TestingConfig)
-
+def test_create_product(app):
     with app.app_context():
-        db.create_all()
-
         product = Product(
             sku="SKU-001",
             name="Produto de teste",
@@ -29,6 +25,3 @@ def test_create_product():
         assert saved_product.name == "Produto de teste"
         assert saved_product.price == Decimal("19.90")
         assert saved_product.stock_quantity == 10
-
-        db.session.remove()
-        db.drop_all()
