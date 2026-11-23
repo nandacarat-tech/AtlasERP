@@ -60,6 +60,7 @@ Este documento é a fonte única de verdade compartilhada entre todas as convers
     - Exibição de indicador de status no cabeçalho do ERP: `🟢 Modo Demonstração • Vitrine NandaTech`.
     - **Proteção Anti-Sabotagem da Vitrine:** Blindagem em `app/routes.py` para impedir que visitantes em sessão demo excluam o acervo original semeado (clientes, produtos base, motoristas, rotas e lançamentos financeiros). Novos cadastros criados pelos visitantes podem ser excluídos normalmente.
     - Suíte de 166 testes automatizados executada e 100% aprovada (`166 passed`).
+    - **Diretriz de Identidade Visual de Produtos vs. Hub:** O logotipo original do Atlas ERP foi preservado e restaurado em `static/images/logo.jpg`. O logotipo oficial da NandaTech (`static/images/nandatech_logo.jpg`) atua como a assinatura corporativa no rodapé com o selo *"Produzido com ❤️ por NandaTech"*. Cada produto do ecossistema mantém sua própria marca de produto.
     - Commits e push realizados com sucesso em `nandacarat-tech/AtlasERP`.
 
 ---
