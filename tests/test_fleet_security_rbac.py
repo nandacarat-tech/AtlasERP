@@ -150,3 +150,61 @@ def test_demo_showcase_anti_sabotage_protection_returns_403(app, client):
     assert res_del_ephemeral.status_code == 200
     assert res_del_ephemeral.get_json()["message"] == "Rota excluída com sucesso."
 
+
+def test_lgpd_driver_data_minimization_and_masking(client_factory, app):
+    """
+    Comprova a política de minimização de dados LGPD (SEC-02):
+    - Perfis de CONSULTA recebem CPF, CNH e telefone mascarados.
+    - Perfis de ADMIN e GERENTE recebem os dados integrais para gestão operacional.
+    """
+    from datetime import date
+    with app.app_context():
+        driver = Driver(
+            name="Ayrton Senna da Silva",
+            cpf="111.222.333-44",
+            phone="(11) 98765-4321",
+            license_number="12345678901",
+            license_category="AE",
+            license_expiry=date(2028, 5, 1),
+            status="ACTIVE"
+        )
+        db.session.add(driver)
+        db.session.commit()
+        driver_id = driver.id
+
+    client_consulta = client_factory("CONSULTA")
+    client_gerente = client_factory("GERENTE")
+    client_admin = client_factory("ADMIN")
+
+    # 1. Perfil CONSULTA: Dados devem vir MASCARADOS
+    res_consulta = client_consulta.get(f"/fleet/drivers/{driver_id}")
+    assert res_consulta.status_code == 200
+    data_c = res_consulta.get_json()
+    assert data_c["cpf"] == "***.***.333-**"
+    assert data_c["license_number"] == "*******8901"
+    assert "98765" not in data_c["phone"]
+    assert "****" in data_c["phone"]
+
+    # Testar também na listagem
+    res_list_c = client_consulta.get("/api/fleet/drivers")
+    assert res_list_c.status_code == 200
+    item_c = [d for d in res_list_c.get_json() if d["id"] == driver_id][0]
+    assert item_c["cpf"] == "***.***.333-**"
+    assert item_c["license_number"] == "*******8901"
+
+    # 2. Perfil GERENTE: Dados devem vir COMPLETOS
+    res_gerente = client_gerente.get(f"/fleet/drivers/{driver_id}")
+    assert res_gerente.status_code == 200
+    data_g = res_gerente.get_json()
+    assert data_g["cpf"] == "111.222.333-44"
+    assert data_g["license_number"] == "12345678901"
+    assert data_g["phone"] == "(11) 98765-4321"
+
+    # 3. Perfil ADMIN: Dados devem vir COMPLETOS
+    res_admin = client_admin.get(f"/fleet/drivers/{driver_id}")
+    assert res_admin.status_code == 200
+    data_a = res_admin.get_json()
+    assert data_a["cpf"] == "111.222.333-44"
+    assert data_a["license_number"] == "12345678901"
+
+

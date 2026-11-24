@@ -241,3 +241,38 @@ def test_concurrent_resolve_delivery_return_race_condition(app, client_factory):
         ret = db.session.get(DeliveryReturn, return_id)
         assert ret.stock_restored is True
 
+
+def test_resolve_delivery_return_all_or_nothing_missing_sale_or_product(client, app):
+    """
+    Comprova que se a venda ou o produto vinculado à ocorrência não existir,
+    a resolução com RETURNED_TO_STOCK falha com erro 422, sofre rollback
+    e NUNCA marca stock_restored como True.
+    """
+    from datetime import date
+    with app.app_context():
+        # Cria uma devolução apontando para uma venda inexistente (ID=99999)
+        ret_ghost_sale = DeliveryReturn(
+            customer_name="Cliente Fantasma",
+            sale_id=99999,
+            reason="CLIENT_REFUSED",
+            status="PENDING_RETURN",
+            stock_restored=False
+        )
+        db.session.add(ret_ghost_sale)
+        db.session.commit()
+        ghost_id = ret_ghost_sale.id
+
+    # Tentativa de resolução deve falhar com 422 e não confirmar stock_restored
+    res_fail = client.post(f"/api/fleet/returns/{ghost_id}/resolve", json={
+        "status": "RETURNED_TO_STOCK",
+        "action_taken": "Tentando forçar reposição de venda inexistente"
+    })
+    assert res_fail.status_code == 422
+    assert "Venda vinculada à devolução não encontrada" in res_fail.get_json()["error"]
+
+    with app.app_context():
+        r = db.session.get(DeliveryReturn, ghost_id)
+        assert r.stock_restored is False
+        assert r.status == "PENDING_RETURN"
+
+

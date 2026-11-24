@@ -3,7 +3,7 @@ from functools import wraps
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, jsonify, request, render_template, redirect, url_for, session, current_app
+from flask import Blueprint, jsonify, request, render_template, redirect, url_for, session, current_app, g
 from werkzeug.security import check_password_hash
 
 
@@ -2144,8 +2144,22 @@ DRIVER_STATUSES = {
 }
 
 
-def driver_to_dict(driver):
-    return driver.to_dict()
+def should_mask_driver_data() -> bool:
+    """
+    Retorna True se o usuário autenticado NÃO possuir permissão fleet.manage
+    (ex: usuários com perfil CONSULTA), aplicando o princípio de minimização de dados da LGPD.
+    """
+    user = getattr(g, "current_user", None)
+    if user and user.can("fleet.manage"):
+        return False
+    # Usuários sem fleet.manage recebem dados pessoais mascarados
+    return True
+
+
+def driver_to_dict(driver, mask_sensitive: bool | None = None):
+    if mask_sensitive is None:
+        mask_sensitive = should_mask_driver_data()
+    return driver.to_dict(mask_sensitive=mask_sensitive)
 
 
 def route_to_dict(route):
@@ -2157,7 +2171,8 @@ def route_to_dict(route):
 @permission_required("fleet.view")
 def list_fleet_drivers():
     drivers = Driver.query.order_by(Driver.id.desc()).all()
-    return jsonify([driver.to_dict() for driver in drivers])
+    mask = should_mask_driver_data()
+    return jsonify([driver.to_dict(mask_sensitive=mask) for driver in drivers])
 
 
 @main.post("/fleet/drivers")
@@ -2244,7 +2259,7 @@ def get_fleet_driver(driver_id):
     if driver is None:
         return jsonify({"error": "Motorista não encontrado."}), 404
 
-    return jsonify(driver.to_dict())
+    return jsonify(driver_to_dict(driver))
 
 
 @main.put("/fleet/drivers/<int:driver_id>")
@@ -2952,22 +2967,36 @@ def resolve_delivery_return(return_id):
     # Somente a transação que atualizar a linha (rowcount == 1) tem o direito de aplicar o saldo!
     if new_status == "RETURNED_TO_STOCK":
         if delivery_return.sale_id and not delivery_return.stock_restored:
+            # 1. Validação Estrita (All-or-Nothing): A venda DEVE existir
+            sale = db.session.get(Sale, delivery_return.sale_id)
+            if not sale:
+                db.session.rollback()
+                return jsonify({"error": "Venda vinculada à devolução não encontrada."}), 422
+
+            # 2. Todos os produtos dos itens DEVEM existir
+            sale_products = []
+            for item in sale.items:
+                product = db.session.get(Product, item.product_id)
+                if not product:
+                    db.session.rollback()
+                    return jsonify({"error": f"Produto ID {item.product_id} vinculado à venda não encontrado."}), 422
+                sale_products.append((product, item.quantity))
+
+            # 3. Executa a trava atômica no banco
             affected = db.session.execute(
                 db.text("UPDATE delivery_returns SET stock_restored = 1 WHERE id = :id AND stock_restored = 0"),
                 {"id": delivery_return.id}
             ).rowcount
+
+            # 4. Somente a requisição vencedora repõe o estoque de todos os itens validados
             if affected == 1:
                 delivery_return.stock_restored = True
-                sale = db.session.get(Sale, delivery_return.sale_id)
-                if sale:
-                    for item in sale.items:
-                        product = db.session.get(Product, item.product_id)
-                        if product:
-                            apply_stock_in(
-                                product=product,
-                                quantity=item.quantity,
-                                sale_id=sale.id,
-                            )
+                for product, qty in sale_products:
+                    apply_stock_in(
+                        product=product,
+                        quantity=qty,
+                        sale_id=sale.id,
+                    )
 
     db.session.commit()
     return jsonify(delivery_return.to_dict())

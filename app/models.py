@@ -93,6 +93,35 @@ class FleetMaintenance(db.Model):
         return f"<FleetMaintenance {self.id}>"
 
 
+def mask_cpf(cpf: str | None) -> str | None:
+    if not cpf:
+        return cpf
+    clean = "".join(filter(str.isdigit, str(cpf)))
+    if len(clean) == 11:
+        # Exibe apenas os 3 dígitos intermediários: ***.***.345-**
+        return f"***.***.{clean[6:9]}-**"
+    return "***.***.***-**"
+
+
+def mask_cnh(cnh: str | None) -> str | None:
+    if not cnh:
+        return cnh
+    clean = str(cnh).strip()
+    if len(clean) >= 4:
+        return f"{'*' * (len(clean) - 4)}{clean[-4:]}"
+    return "***********"
+
+
+def mask_phone(phone: str | None) -> str | None:
+    if not phone:
+        return phone
+    clean = str(phone).strip()
+    # Mantém DDD e últimos 4 dígitos: (89) 9****-9226
+    if len(clean) >= 10:
+        return f"{clean[:5]}****-{clean[-4:]}"
+    return "****-****"
+
+
 class Driver(db.Model):
     __tablename__ = "drivers"
 
@@ -120,13 +149,13 @@ class Driver(db.Model):
 
     routes = db.relationship("Route", backref="driver", lazy=True)
 
-    def to_dict(self):
+    def to_dict(self, mask_sensitive: bool = False):
         return {
             "id": self.id,
             "name": self.name,
-            "cpf": self.cpf,
-            "phone": self.phone,
-            "license_number": self.license_number,
+            "cpf": mask_cpf(self.cpf) if mask_sensitive else self.cpf,
+            "phone": mask_phone(self.phone) if mask_sensitive else self.phone,
+            "license_number": mask_cnh(self.license_number) if mask_sensitive else self.license_number,
             "license_category": self.license_category,
             "license_expiry": (
                 self.license_expiry.isoformat()
