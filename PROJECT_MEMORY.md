@@ -60,8 +60,21 @@ Este documento é a fonte única de verdade compartilhada entre todas as convers
     - Exibição de indicador de status no cabeçalho do ERP: `🟢 Modo Demonstração • Vitrine NandaTech`.
     - **Proteção Anti-Sabotagem da Vitrine:** Blindagem em `app/routes.py` para impedir que visitantes em sessão demo excluam o acervo original semeado (clientes, produtos base, motoristas, rotas e lançamentos financeiros). Novos cadastros criados pelos visitantes podem ser excluídos normalmente.
     - Suíte de 166 testes automatizados executada e 100% aprovada (`166 passed`).
-    - **Diretriz de Identidade Visual de Produtos vs. Hub:** O logotipo original do Atlas ERP foi preservado e restaurado em `static/images/logo.jpg`. O logotipo oficial da NandaTech (`static/images/nandatech_logo.jpg`) atua como a assinatura corporativa no rodapé com o selo *"Produzido com ❤️ por NandaTech"*. Cada produto do ecossistema mantém sua própria marca de produto.
     - Commits e push realizados com sucesso em `nandacarat-tech/AtlasERP`.
+
+### Sessão de Auditoria Independente, Hardening de Frota, Concorrência e LGPD (2026-11-24)
+- **Tópico:** Auditoria defensiva interna (Red Team), remediação de Broken Access Control na frota, mitigação de race condition e inflação de estoque, minimização de dados pessoais (LGPD) e rastreabilidade criptográfica de release em produção.
+- **O que foi realizado:**
+  - **SEC-01 (Broken Access Control):** Bloqueio estrito de acesso anônimo (`HTTP 401`) em todos os endpoints de frota e devoluções (`/fleet/*`, `/api/fleet/*`). Matriz de RBAC por perfil implementada e testada: `CONSULTA` tem apenas leitura; `VENDEDOR` e `ESTOQUISTA` têm mutações bloqueadas com `403`; `GERENTE` e `ADMIN` possuem acesso operacional.
+  - **SEC-02 (Minimização de Dados / LGPD):** Exposição pública eliminada; serialização no backend refatorada para aplicar mascaramento automático de CPF (`***.***.025-**`), CNH (`*******0025`) e telefone para usuários com perfil `CONSULTA`. Perfis com permissão `fleet.manage` (`ADMIN`/`GERENTE`) mantêm acesso completo para gestão de escala e conformidade de trânsito.
+  - **SEC-03 (Concorrência e Integridade em Devoluções):** Neutralizado o exploit de inflação de estoque via *Ping-Pong* de status. Implementada trava atômica no banco (`UPDATE delivery_returns SET stock_restored = 1 WHERE id = :id AND stock_restored = 0`), garantindo que apenas uma transação vencedora efetue a reposição. Adicionada validação estrita *all-or-nothing* com `rollback()` caso a venda vinculada ou qualquer um de seus produtos não exista. Teste de concorrência multithread criado e validado.
+  - **SEC-04 (Proteção Anti-Sabotagem da Vitrine):** Refatorada a função `is_protected_demo_record` para identificar dinamicamente o acervo original semeado mesmo após re-seeds com IDs superiores. Registros semeados (ex: Rota ID 31) retornam `HTTP 403 Forbidden` com aviso educativo; registros efêmeros criados pelo visitante (ex: Rota ID 59) são excluídos com `HTTP 200 OK`.
+  - **Suíte de Testes Automatizada:** Expandida para **207 testes automatizados (100% GREEN / Aprovados)**.
+  - **Rastreabilidade de Release em Produção:**
+    - Revisão Ativa no Cloud Run: `atlas-erp-00017-9bt`
+    - Commit Git de Origem: `ba79c96`
+    - Container Image Digest: `southamerica-east1-docker.pkg.dev/atlas-erp-prod-2026/cloud-run-source-deploy/atlas-erp@sha256:b8f1c1eeb4bdc37188c1a15359f39b98c24aa787c0bcf5bfa4434d182602e41c`
+    - Status do Tráfego: 100% atendido pela revisão `atlas-erp-00017-9bt`.
 
 ---
 
