@@ -278,6 +278,15 @@ def login_demo():
     Acesso direto de 1 clique para visitantes, clientes e recrutadores
     avaliarem o ERP com permissões totais de Administrador.
     """
+    if not current_app.config.get("ERP_DEMO_MODE", True):
+        log_audit_event(
+            action="BLOCKED_DEMO_LOGIN",
+            entity_type="DemoSession",
+            changes={"reason": "Modo demonstracao desativado"},
+            commit=True,
+        )
+        return render_template("login.html", error="O modo de demonstração está desativado nesta instância corporativa.", next_url="/dashboard")
+
     next_url = request.form.get("next", "/dashboard")
     db_user = User.query.filter_by(username="admin").first()
 
@@ -309,6 +318,15 @@ def process_login():
 
     # Acesso rápido de demonstração via credenciais universais da vitrine (senha: demo)
     if username.lower() in ("admin", "demo") and password.lower() == "demo":
+        if not current_app.config.get("ERP_DEMO_MODE", True):
+            log_audit_event(
+                action="BLOCKED_DEMO_CREDENTIALS",
+                entity_type="DemoSession",
+                changes={"reason": "Modo demonstracao desativado", "attempted": username},
+                commit=True,
+            )
+            return render_template("login.html", error=GENERIC_LOGIN_ERROR, next_url=next_url)
+
         db_user = User.query.filter_by(username="admin").first()
         session.clear()
         session["user_authenticated"] = True
@@ -408,8 +426,8 @@ def process_financial_unlock():
     elif expected_plain:
         is_valid_financial = hmac.compare_digest(financial_pass, expected_plain)
 
-    # Aceita senha de demonstração "demo" ou "financeiro123" na vitrine pública
-    if not is_valid_financial and financial_pass.lower() in ("demo", "financeiro123", "demo123"):
+    # Aceita senha de demonstração "demo" ou "financeiro123" na vitrine pública somente se ERP_DEMO_MODE=True
+    if not is_valid_financial and current_app.config.get("ERP_DEMO_MODE", True) and financial_pass.lower() in ("demo", "financeiro123", "demo123"):
         is_valid_financial = True
 
     if is_valid_financial:
@@ -426,6 +444,8 @@ def process_financial_unlock_demo():
     """
     if not session.get("user_authenticated"):
         return redirect(url_for("main.login", next="/ui/financial"))
+    if not current_app.config.get("ERP_DEMO_MODE", True):
+        return redirect(url_for("main.financial_unlock", next="/ui/financial"))
     session["financial_unlocked"] = True
     next_url = request.form.get("next", "/ui/financial")
     log_audit_event(action="FINANCIAL_UNLOCK_DEMO", entity_type="DemoSession", commit=True)

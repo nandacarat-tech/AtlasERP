@@ -44,6 +44,9 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = timedelta(hours=int(os.getenv("SESSION_LIFETIME_HOURS", "8")))
 
+    # Modo Demonstração / Vitrine Pública (permite acesso rápido com credenciais demo)
+    ERP_DEMO_MODE = os.getenv("ERP_DEMO_MODE", "true").lower() in ("true", "1", "yes")
+
     # Acesso Emergencial (Break-Glass Account) - Desativado por padrao!
     ERP_EMERGENCY_ADMIN_ENABLED = os.getenv("ERP_EMERGENCY_ADMIN_ENABLED", "false").lower() in ("true", "1", "yes")
     ERP_ADMIN_USERNAME = os.getenv("ERP_ADMIN_USERNAME", "admin")
