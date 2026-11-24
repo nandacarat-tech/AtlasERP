@@ -213,3 +213,51 @@ def test_demo_mode_anti_sabotage_protection(client, app):
     res_del_novo = client.delete("/products/999")
     assert res_del_novo.status_code == 200
 
+
+def test_security_headers_present(client):
+    """
+    Garante que os cabeçalhos de segurança HTTP recomendados pelo OWASP
+    estão presentes em todas as respostas HTTP do ERP.
+    """
+    response = client.get("/login")
+    assert response.headers.get("X-Frame-Options") == "SAMEORIGIN"
+    assert response.headers.get("X-Content-Type-Options") == "nosniff"
+    assert "max-age=31536000" in response.headers.get("Strict-Transport-Security", "")
+    assert response.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+    assert "geolocation=()" in response.headers.get("Permissions-Policy", "")
+    assert "default-src 'self'" in response.headers.get("Content-Security-Policy", "")
+
+
+def test_unauthenticated_financial_api_access_control(client):
+    """
+    Garante que as APIs financeiras rejeitam acessos não autenticados com 401
+    e acessos autenticados sem desbloqueio financeiro com 403.
+    """
+    # 1. Totalmente anônimo -> 401 Unauthorized
+    res_anon = client.get("/api/financial/summary")
+    assert res_anon.status_code == 401
+    assert "Autenticação requerida" in res_anon.get_json()["error"]
+
+    res_trans_anon = client.get("/api/financial/transactions")
+    assert res_trans_anon.status_code == 401
+
+    # 2. Usuário autenticado no ERP mas com módulo financeiro bloqueado -> 403 Forbidden
+    with client.session_transaction() as sess:
+        sess["user_authenticated"] = True
+        sess["username"] = "admin"
+        sess["financial_unlocked"] = False
+
+    res_blocked = client.get("/api/financial/summary")
+    assert res_blocked.status_code == 403
+    assert "Acesso bloqueado" in res_blocked.get_json()["error"]
+
+    # 3. Usuário autenticado e com módulo financeiro desbloqueado -> 200 OK
+    with client.session_transaction() as sess:
+        sess["financial_unlocked"] = True
+
+    res_ok = client.get("/api/financial/summary")
+    assert res_ok.status_code == 200
+    assert "total_revenue" in res_ok.get_json()
+
+
+

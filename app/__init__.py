@@ -51,9 +51,25 @@ def create_app(config_object=None):
     app.register_blueprint(main, url_prefix='/')
 
     # Configuracao de Proxy Reverso Confiável (Google Cloud Run / Load Balancer)
-    # Impede que clientes forjem o IP real atraves de cabecalhos X-Forwarded-For arbitrarios
     if app.config.get("USE_PROXY_FIX", False) or app.config.get("IS_PRODUCTION", False):
         from werkzeug.middleware.proxy_fix import ProxyFix
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+
+    # Injeção automática de Cabeçalhos de Segurança HTTP (OWASP / Hardening)
+    @app.after_request
+    def apply_security_headers(response):
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data:; "
+            "script-src 'self' 'unsafe-inline';"
+        )
+        return response
 
     return app

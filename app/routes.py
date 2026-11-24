@@ -2313,6 +2313,7 @@ def delete_fleet_route(route_id):
 # --- Rotas da API para o Módulo Financeiro ---
 
 @main.get("/api/financial/summary")
+@financial_required
 def get_financial_summary():
     transactions = FinancialTransaction.query.filter_by(status="PAID").all()
     pending_transactions = FinancialTransaction.query.filter_by(status="PENDING").all()
@@ -2368,6 +2369,7 @@ def get_financial_summary():
 
 
 @main.get("/api/financial/categories")
+@financial_required
 def list_financial_categories():
     categories = FinancialCategory.query.order_by(FinancialCategory.id).all()
     if not categories:
@@ -2387,6 +2389,7 @@ def list_financial_categories():
 
 
 @main.post("/api/financial/categories")
+@financial_required
 def create_financial_category():
     data = request.get_json(silent=True) or {}
     name = str(data.get("name", "")).strip()
@@ -2402,6 +2405,7 @@ def create_financial_category():
 
 
 @main.get("/api/financial/transactions")
+@financial_required
 def list_financial_transactions():
     trans_type = request.args.get("type")
     status = request.args.get("status")
@@ -2414,6 +2418,7 @@ def list_financial_transactions():
 
 
 @main.post("/api/financial/transactions")
+@financial_required
 def create_financial_transaction():
     data = request.get_json(silent=True) or {}
     description = str(data.get("description", "")).strip()
@@ -2482,6 +2487,7 @@ def create_financial_transaction():
 
 
 @main.put("/api/financial/transactions/<int:trans_id>")
+@financial_required
 def update_financial_transaction(trans_id):
     transaction = db.session.get(FinancialTransaction, trans_id)
     if not transaction:
@@ -2510,6 +2516,7 @@ def update_financial_transaction(trans_id):
 
 
 @main.delete("/api/financial/transactions/<int:trans_id>")
+@financial_required
 def delete_financial_transaction(trans_id):
     transaction = db.session.get(FinancialTransaction, trans_id)
     if not transaction:
@@ -2524,12 +2531,14 @@ def delete_financial_transaction(trans_id):
 
 
 @main.get("/api/financial/payroll")
+@financial_required
 def list_payroll_expenses():
     payrolls = PayrollExpense.query.order_by(PayrollExpense.id.desc()).all()
     return jsonify([p.to_dict() for p in payrolls])
 
 
 @main.post("/api/financial/payroll")
+@financial_required
 def create_payroll_expense():
     data = request.get_json(silent=True) or {}
     employee_name = str(data.get("employee_name", "")).strip()
@@ -2557,6 +2566,7 @@ def create_payroll_expense():
 
 
 @main.put("/api/financial/payroll/<int:payroll_id>")
+@financial_required
 def update_payroll_expense(payroll_id):
     payroll = db.session.get(PayrollExpense, payroll_id)
     if not payroll:
@@ -2581,6 +2591,7 @@ def update_payroll_expense(payroll_id):
 
 
 @main.delete("/api/financial/payroll/<int:payroll_id>")
+@financial_required
 def delete_payroll_expense(payroll_id):
     payroll = db.session.get(PayrollExpense, payroll_id)
     if not payroll:
@@ -2597,12 +2608,14 @@ def delete_payroll_expense(payroll_id):
 # --- Rotas da API para Notas Fiscais (NF-e / SEFAZ) ---
 
 @main.get("/api/financial/invoices")
+@financial_required
 def list_financial_invoices():
     invoices = Invoice.query.order_by(Invoice.id.desc()).all()
     return jsonify([inv.to_dict() for inv in invoices])
 
 
 @main.post("/api/financial/invoices/<int:invoice_id>/emit")
+@financial_required
 def emit_financial_invoice(invoice_id):
     invoice = db.session.get(Invoice, invoice_id)
     if not invoice:

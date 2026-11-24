@@ -5,6 +5,14 @@ from app import db
 from app.financial_models import FinancialCategory, FinancialTransaction, PayrollExpense
 
 
+@pytest.fixture(autouse=True)
+def authenticate_financial_session(client):
+    with client.session_transaction() as sess:
+        sess["user_authenticated"] = True
+        sess["username"] = "admin"
+        sess["financial_unlocked"] = True
+
+
 def test_financial_categories(client):
     response = client.get("/api/financial/categories")
     assert response.status_code == 200
