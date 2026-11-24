@@ -46,6 +46,12 @@ from app.auth_service import (
     permission_required,
     role_required,
 )
+from app.rate_limit_service import (
+    get_client_ip,
+    is_rate_limited,
+    record_failed_attempt,
+    reset_attempts,
+)
 
 
 main = Blueprint("main", __name__)
@@ -316,9 +322,30 @@ def process_login():
 
     GENERIC_LOGIN_ERROR = "Credenciais de acesso incorretas ou conta indisponível."
 
+    client_ip = get_client_ip()
+    rate_key = f"login:{client_ip}"
+    blocked, retry_after = is_rate_limited(rate_key)
+    if blocked:
+        log_audit_event(
+            action="RATE_LIMITED_LOGIN",
+            entity_type="Auth",
+            changes={"ip": client_ip, "retry_after": retry_after, "username": username},
+            commit=True,
+        )
+        return (
+            render_template(
+                "login.html",
+                error=f"Muitas tentativas incorretas. Por segurança, aguarde {retry_after} segundos para tentar novamente.",
+                next_url=next_url,
+            ),
+            429,
+            {"Retry-After": str(retry_after)},
+        )
+
     # Acesso rápido de demonstração via credenciais universais da vitrine (senha: demo)
     if username.lower() in ("admin", "demo") and password.lower() == "demo":
         if not current_app.config.get("ERP_DEMO_MODE", True):
+            record_failed_attempt(rate_key, max_attempts=5, window_seconds=60)
             log_audit_event(
                 action="BLOCKED_DEMO_CREDENTIALS",
                 entity_type="DemoSession",
@@ -327,6 +354,7 @@ def process_login():
             )
             return render_template("login.html", error=GENERIC_LOGIN_ERROR, next_url=next_url)
 
+        reset_attempts(rate_key)
         db_user = User.query.filter_by(username="admin").first()
         session.clear()
         session["user_authenticated"] = True
@@ -343,7 +371,9 @@ def process_login():
     if db_user:
         success, result = authenticate_user(username, password)
         if success:
+            reset_attempts(rate_key)
             return redirect(get_safe_redirect_url(next_url, "/dashboard"))
+        record_failed_attempt(rate_key, max_attempts=5, window_seconds=60)
         return render_template("login.html", error=GENERIC_LOGIN_ERROR, next_url=next_url)
 
     # 2. Se não existir no banco de dados, verifica credenciais de acesso emergencial (Break-Glass)
@@ -353,6 +383,7 @@ def process_login():
 
     is_valid_user = hmac.compare_digest(username, valid_user)
     if is_valid_user and not is_emergency_enabled:
+        record_failed_attempt(rate_key, max_attempts=5, window_seconds=60)
         log_audit_event(
             action="DISABLED_EMERGENCY_ADMIN_ATTEMPT",
             entity_type="ConfigAdmin",
@@ -369,6 +400,7 @@ def process_login():
             is_valid_pass = False
 
         if is_valid_pass:
+            reset_attempts(rate_key)
             session.clear()
             session["user_authenticated"] = True
             session["username"] = username
@@ -378,6 +410,7 @@ def process_login():
             log_audit_event(action="LOGIN_EMERGENCY_ADMIN", entity_type="ConfigAdmin", commit=True)
             return redirect(get_safe_redirect_url(next_url, "/dashboard"))
 
+    record_failed_attempt(rate_key, max_attempts=5, window_seconds=60)
     log_audit_event(
         action="FAILED_LOGIN",
         entity_type="User",
@@ -414,6 +447,27 @@ def process_financial_unlock():
 
     financial_pass = str(request.form.get("financial_password", "")).strip()
     next_url = request.form.get("next", "/ui/financial")
+
+    client_ip = get_client_ip()
+    rate_key = f"fin_unlock:{client_ip}"
+    blocked, retry_after = is_rate_limited(rate_key)
+    if blocked:
+        log_audit_event(
+            action="RATE_LIMITED_FINANCIAL_UNLOCK",
+            entity_type="Financial",
+            changes={"ip": client_ip, "retry_after": retry_after},
+            commit=True,
+        )
+        return (
+            render_template(
+                "financial_unlock.html",
+                error=f"Muitas tentativas incorretas. Por segurança, aguarde {retry_after} segundos para tentar novamente.",
+                next_url=next_url,
+            ),
+            429,
+            {"Retry-After": str(retry_after)},
+        )
+
     expected_hash = current_app.config.get("FINANCIAL_ACCESS_PASSWORD_HASH")
     expected_plain = current_app.config.get("FINANCIAL_ACCESS_PASSWORD")
 
@@ -431,9 +485,11 @@ def process_financial_unlock():
         is_valid_financial = True
 
     if is_valid_financial:
+        reset_attempts(rate_key)
         session["financial_unlocked"] = True
         return redirect(get_safe_redirect_url(next_url, "/ui/financial"))
 
+    record_failed_attempt(rate_key, max_attempts=5, window_seconds=60)
     return render_template("financial_unlock.html", error="Senha do módulo financeiro incorreta.", next_url=next_url)
 
 
@@ -654,7 +710,21 @@ def financial_invoices_page():
 @main.get("/products")
 @permission_required("products.view")
 def list_products():
-    products = Product.query.order_by(Product.id).all()
+    limit_arg = request.args.get("limit") or request.args.get("per_page")
+    query = Product.query.order_by(Product.id)
+
+    if limit_arg is not None:
+        try:
+            limit_val = int(limit_arg)
+        except (ValueError, TypeError):
+            return jsonify({"error": "limit must be an integer"}), 400
+
+        if limit_val <= 0 or limit_val > 100:
+            return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+        query = query.limit(limit_val)
+
+    products = query.all()
     return jsonify([product_to_dict(product) for product in products])
 
 
@@ -850,7 +920,21 @@ def permanently_delete_product(product_id):
 @main.get("/customers")
 @permission_required("customers.view")
 def list_customers():
-    customers = Customer.query.order_by(Customer.id).all()
+    limit_arg = request.args.get("limit") or request.args.get("per_page")
+    query = Customer.query.order_by(Customer.id)
+
+    if limit_arg is not None:
+        try:
+            limit_val = int(limit_arg)
+        except (ValueError, TypeError):
+            return jsonify({"error": "limit must be an integer"}), 400
+
+        if limit_val <= 0 or limit_val > 100:
+            return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+        query = query.limit(limit_val)
+
+    customers = query.all()
     return jsonify([customer_to_dict(customer) for customer in customers])
 
 
