@@ -53,7 +53,14 @@ def create_app(config_object=None):
     # Configuracao de Proxy Reverso Confiável (Google Cloud Run / Load Balancer)
     if app.config.get("USE_PROXY_FIX", False) or app.config.get("IS_PRODUCTION", False):
         from werkzeug.middleware.proxy_fix import ProxyFix
-        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+    # Em ambientes de produção (Cloud Run / MySQL), aplica migrações pendentes de schema automaticamente
+    if app.config.get("IS_PRODUCTION", False) and not app.config.get("TESTING", False):
+        try:
+            with app.app_context():
+                from flask_migrate import upgrade as _flask_migrate_upgrade
+                _flask_migrate_upgrade()
+        except Exception as _mig_err:
+            app.logger.warning(f"Migração automática de startup falhou ou já aplicada: {_mig_err}")
 
     from app.csrf_service import generate_csrf_token, validate_request_origin
 
