@@ -80,16 +80,32 @@ def is_protected_demo_record(entity_name: str, entity_id: int) -> bool:
     if not session.get("is_demo_session"):
         return False
 
-    DEMO_SEEDED_LIMITS = {
-        "Product": 20,
-        "Customer": 500,
-        "Driver": 25,
-        "Route": 25,
-        "FinancialTransaction": 30,
-        "PayrollExpense": 10,
+    DEMO_SEEDED_COUNTS = {
+        "Product": (Product, 20),
+        "Customer": (Customer, 500),
+        "Driver": (Driver, 25),
+        "Route": (Route, 25),
+        "FinancialTransaction": (FinancialTransaction, 30),
+        "PayrollExpense": (PayrollExpense, 10),
     }
-    limit = DEMO_SEEDED_LIMITS.get(entity_name, 0)
-    return entity_id <= limit
+
+    config = DEMO_SEEDED_COUNTS.get(entity_name)
+    if not config:
+        return False
+
+    model_cls, original_count = config
+    # Protege contra limites estáticos (se a base começou no ID 1)
+    if entity_id <= original_count:
+        return True
+
+    # Se a base sofreu re-seed em MySQL/Cloud Run onde o auto_increment não reiniciou em 1,
+    # protege dinamicamente os primeiros N registros existentes da vitrine
+    min_id = db.session.query(db.func.min(model_cls.id)).scalar()
+    if min_id is not None:
+        # Se o ID pertencer à faixa original semeada [min_id, min_id + original_count)
+        return entity_id < (min_id + original_count)
+
+    return False
 
 
 def product_to_dict(product):
