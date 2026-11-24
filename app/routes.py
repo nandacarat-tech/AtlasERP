@@ -2909,7 +2909,12 @@ def create_delivery_return():
 @main.post("/api/fleet/returns/<int:return_id>/resolve")
 @permission_required("fleet.manage")
 def resolve_delivery_return(return_id):
-    delivery_return = db.session.get(DeliveryReturn, return_id)
+    # Trava pessimista de linha (FOR UPDATE) para serializar requisições concorrentes sobre o mesmo registro
+    delivery_return = (
+        DeliveryReturn.query.filter_by(id=return_id)
+        .with_for_update()
+        .first()
+    )
     if not delivery_return:
         return jsonify({"error": "Ocorrência de entrega não encontrada."}), 404
 
@@ -2925,21 +2930,28 @@ def resolve_delivery_return(return_id):
     if action_taken is not None:
         delivery_return.action_taken = action_taken
 
-    # Logística Reversa Atômica e Idempotente:
-    # Apenas repõe estoque se for alterado para RETURNED_TO_STOCK E o estoque ainda não tiver sido reposto nesta ocorrência
+    # Logística Reversa Atômica e Idempotente sob Concorrência:
+    # Apenas repõe estoque se for alterado para RETURNED_TO_STOCK E se o estoque ainda NÃO tiver sido reposto.
+    # Executamos um UPDATE atômico condicional direto no banco (WHERE stock_restored = False).
+    # Somente a transação que atualizar a linha (rowcount == 1) tem o direito de aplicar o saldo!
     if new_status == "RETURNED_TO_STOCK":
-        if not delivery_return.stock_restored and delivery_return.sale_id:
-            sale = db.session.get(Sale, delivery_return.sale_id)
-            if sale:
-                for item in sale.items:
-                    product = db.session.get(Product, item.product_id)
-                    if product:
-                        apply_stock_in(
-                            product=product,
-                            quantity=item.quantity,
-                            sale_id=sale.id,
-                        )
+        if delivery_return.sale_id and not delivery_return.stock_restored:
+            affected = db.session.execute(
+                db.text("UPDATE delivery_returns SET stock_restored = 1 WHERE id = :id AND stock_restored = 0"),
+                {"id": delivery_return.id}
+            ).rowcount
+            if affected == 1:
                 delivery_return.stock_restored = True
+                sale = db.session.get(Sale, delivery_return.sale_id)
+                if sale:
+                    for item in sale.items:
+                        product = db.session.get(Product, item.product_id)
+                        if product:
+                            apply_stock_in(
+                                product=product,
+                                quantity=item.quantity,
+                                sale_id=sale.id,
+                            )
 
     db.session.commit()
     return jsonify(delivery_return.to_dict())

@@ -177,3 +177,67 @@ def test_exploit_infinite_stock_inflation_via_status_ping_pong(client, app):
         assert p2.stock_quantity == 15
         ret = db.session.get(DeliveryReturn, return_id)
         assert ret.stock_restored is True
+
+
+def test_concurrent_resolve_delivery_return_race_condition(app, client_factory):
+    """
+    Simula 5 requisições concorrentes disparadas simultaneamente para resolver a mesma ocorrência
+    com status RETURNED_TO_STOCK.
+    Garante que exatamente uma transação consiga incrementar o estoque no banco (atomicidade SQL).
+    """
+    import concurrent.futures
+
+    with app.app_context():
+        customer = Customer(name="Cliente Concorrencia", document="529.982.247-25", email="race@teste.com")
+        db.session.add(customer)
+        product = Product(sku="PROD-RACE-01", name="Placa de Video Concorrente", price="3000.00", stock_quantity=10, minimum_stock=1)
+        db.session.add(product)
+        db.session.commit()
+        prod_id = product.id
+
+        sale = Sale(customer_id=customer.id, total_amount="3000.00", status="CONFIRMED")
+        db.session.add(sale)
+        db.session.commit()
+
+        sale_item = SaleItem(sale_id=sale.id, product_id=prod_id, quantity=3, unit_price="3000.00")
+        db.session.add(sale_item)
+        db.session.commit()
+        sale_id = sale.id
+
+    client = client_factory("ADMIN")
+    res_create = client.post("/api/fleet/returns", json={
+        "customer_name": "Cliente Concorrencia",
+        "sale_id": sale_id,
+        "reason": "CLIENT_ABSENT"
+    })
+    return_id = res_create.get_json()["id"]
+
+    # Dispara chamadas simultaneas com isolamento seguro por thread
+    def call_resolve(worker_id):
+        with app.app_context():
+            worker_client = client_factory("ADMIN")
+            try:
+                return worker_client.post(
+                    f"/api/fleet/returns/{return_id}/resolve",
+                    json={"status": "RETURNED_TO_STOCK", "action_taken": f"Concorrencia Worker {worker_id}"}
+                )
+            finally:
+                db.session.remove()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(call_resolve, i) for i in range(3)]
+        responses = [f.result() for f in futures]
+
+    # Todas as requisições devem ser processadas com sucesso (200)
+    for res in responses:
+        assert res.status_code == 200
+
+    # O estoque inicial era 10. A venda foi de 3 itens.
+    # O estoque final DEVE ser 10 + 3 = 13.
+    # Se houvesse race condition, o estoque seria 10 + (3 * 5) = 25!
+    with app.app_context():
+        final_product = db.session.get(Product, prod_id)
+        assert final_product.stock_quantity == 13
+        ret = db.session.get(DeliveryReturn, return_id)
+        assert ret.stock_restored is True
+

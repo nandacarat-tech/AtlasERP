@@ -60,28 +60,93 @@ def test_rbac_role_boundaries_on_fleet_management(client_factory, app):
     # 1. Perfil CONSULTA
     assert client_consulta.get("/api/fleet/vehicles").status_code == 200
     assert client_consulta.get("/api/fleet/drivers").status_code == 200
+    assert client_consulta.get("/api/fleet/routes").status_code == 200
+    assert client_consulta.get("/api/fleet/returns").status_code == 200
+
+    # Bloqueio de mutação (403) para CONSULTA
     res_block = client_consulta.post("/fleet/vehicles", json={"plate": "BLK-9999", "vehicle_type": "Van"})
     assert res_block.status_code == 403
     assert res_block.get_json()["required_permission"] == "fleet.manage"
-
-    # 2. Perfil VENDEDOR
-    assert client_vendedor.get("/api/fleet/vehicles").status_code == 403
-    assert client_vendedor.get("/api/fleet/drivers").status_code == 403
-    assert client_vendedor.post("/fleet/vehicles", json={"plate": "BLK-9999"}).status_code == 403
-    # Operações destrutivas são terminantemente bloqueadas para VENDEDOR (403)
-    assert client_vendedor.delete("/fleet/drivers/1").status_code == 403
-    assert client_vendedor.delete("/fleet/routes/1").status_code == 403
-    assert client_vendedor.post("/api/fleet/returns/1/resolve", json={"status": "RETURNED_TO_STOCK"}).status_code == 403
-
-    # Operações destrutivas são terminantemente bloqueadas para CONSULTA (403)
+    assert client_consulta.post("/fleet/drivers", json={"name": "Motorista Fake"}).status_code == 403
+    assert client_consulta.post("/fleet/routes", json={"route_name": "Rota Fake"}).status_code == 403
+    assert client_consulta.put("/fleet/drivers/1", json={"name": "Alterado"}).status_code == 403
+    assert client_consulta.put("/fleet/routes/1", json={"route_name": "Alterado"}).status_code == 403
     assert client_consulta.delete("/fleet/drivers/1").status_code == 403
     assert client_consulta.delete("/fleet/routes/1").status_code == 403
     assert client_consulta.post("/api/fleet/returns/1/resolve", json={"status": "RETURNED_TO_STOCK"}).status_code == 403
 
-    # 3. Perfil GERENTE
+    # 2. Perfil VENDEDOR (sem permissões de frota - 403 em leitura e escrita)
+    assert client_vendedor.get("/api/fleet/vehicles").status_code == 403
+    assert client_vendedor.get("/api/fleet/drivers").status_code == 403
+    assert client_vendedor.get("/api/fleet/routes").status_code == 403
+    assert client_vendedor.get("/api/fleet/returns").status_code == 403
+    assert client_vendedor.post("/fleet/vehicles", json={"plate": "BLK-9999"}).status_code == 403
+    assert client_vendedor.post("/fleet/drivers", json={"name": "Motorista Fake"}).status_code == 403
+    assert client_vendedor.post("/fleet/routes", json={"route_name": "Rota Fake"}).status_code == 403
+    assert client_vendedor.put("/fleet/drivers/1", json={"name": "Alterado"}).status_code == 403
+    assert client_vendedor.put("/fleet/routes/1", json={"route_name": "Alterado"}).status_code == 403
+    assert client_vendedor.delete("/fleet/drivers/1").status_code == 403
+    assert client_vendedor.delete("/fleet/routes/1").status_code == 403
+    assert client_vendedor.post("/api/fleet/returns/1/resolve", json={"status": "RETURNED_TO_STOCK"}).status_code == 403
+
+    # 3. Perfil ESTOQUISTA (não possui fleet.manage - 403 nas mutações de frota)
+    client_estoquista = client_factory("ESTOQUISTA")
+    assert client_estoquista.post("/fleet/vehicles", json={"plate": "EST-1234"}).status_code == 403
+    assert client_estoquista.post("/fleet/drivers", json={"name": "Motorista Fake"}).status_code == 403
+    assert client_estoquista.post("/fleet/routes", json={"route_name": "Rota Fake"}).status_code == 403
+    assert client_estoquista.delete("/fleet/drivers/1").status_code == 403
+    assert client_estoquista.delete("/fleet/routes/1").status_code == 403
+
+    # 4. Perfil GERENTE (possui fleet.view e fleet.manage)
     res_gerente_post = client_gerente.post("/fleet/vehicles", json={
         "plate": "GER-1010",
         "vehicle_type": "Caminhao",
         "status": "AVAILABLE"
     })
     assert res_gerente_post.status_code == 201
+
+
+def test_demo_showcase_anti_sabotage_protection_returns_403(app, client):
+    """
+    Comprova que a função is_protected_demo_record protege com HTTP 403 Forbidden
+    os registros semeados da vitrine quando uma sessão de demonstração tenta excluí-los.
+    """
+    from datetime import date
+    with app.app_context():
+        # Cria rota semeada com ID baixo (<= 25)
+        seeded_route = Route(
+            id=10,
+            route_name="Rota Vitrine Semeada",
+            start_date=date(2026, 9, 1),
+            status="PENDING"
+        )
+        # Cria rota efêmera criada por visitante com ID alto (> 25)
+        ephemeral_route = Route(
+            id=999,
+            route_name="Rota Criada pelo Visitante",
+            start_date=date(2026, 9, 1),
+            status="PENDING"
+        )
+        db.session.add(seeded_route)
+        db.session.add(ephemeral_route)
+        db.session.commit()
+
+    # Simula sessão de demonstração da vitrine (is_demo_session = True, ADMIN)
+    with client.session_transaction() as sess:
+        sess["user_authenticated"] = True
+        sess["username"] = "demo_admin"
+        sess["is_demo_session"] = True
+        sess["is_superuser"] = True
+        sess["role"] = "ADMIN"
+
+    # 1. Tentativa de exclusão do registro semeado (ID=10) -> DEVE RETORNAR 403 FORBIDDEN
+    res_del_seeded = client.delete("/fleet/routes/10")
+    assert res_del_seeded.status_code == 403
+    assert "Modo Demonstração" in res_del_seeded.get_json()["error"]
+    assert "preservar o acervo mestre da vitrine" in res_del_seeded.get_json()["error"]
+
+    # 2. Exclusão de registro efêmero criado pelo próprio visitante (ID=999) -> DEVE RETORNAR 200 OK
+    res_del_ephemeral = client.delete("/fleet/routes/999")
+    assert res_del_ephemeral.status_code == 200
+    assert res_del_ephemeral.get_json()["message"] == "Rota excluída com sucesso."
+
