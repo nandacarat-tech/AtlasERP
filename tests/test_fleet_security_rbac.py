@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 from app import db
 from app.models import FleetVehicle, Driver, Route, DeliveryReturn, Product
 from app.customer_models import Customer
@@ -68,6 +68,15 @@ def test_rbac_role_boundaries_on_fleet_management(client_factory, app):
     assert client_vendedor.get("/api/fleet/vehicles").status_code == 403
     assert client_vendedor.get("/api/fleet/drivers").status_code == 403
     assert client_vendedor.post("/fleet/vehicles", json={"plate": "BLK-9999"}).status_code == 403
+    # Operações destrutivas são terminantemente bloqueadas para VENDEDOR (403)
+    assert client_vendedor.delete("/fleet/drivers/1").status_code == 403
+    assert client_vendedor.delete("/fleet/routes/1").status_code == 403
+    assert client_vendedor.post("/api/fleet/returns/1/resolve", json={"status": "RETURNED_TO_STOCK"}).status_code == 403
+
+    # Operações destrutivas são terminantemente bloqueadas para CONSULTA (403)
+    assert client_consulta.delete("/fleet/drivers/1").status_code == 403
+    assert client_consulta.delete("/fleet/routes/1").status_code == 403
+    assert client_consulta.post("/api/fleet/returns/1/resolve", json={"status": "RETURNED_TO_STOCK"}).status_code == 403
 
     # 3. Perfil GERENTE
     res_gerente_post = client_gerente.post("/fleet/vehicles", json={

@@ -232,6 +232,7 @@ class DeliveryReturn(db.Model):
     attempt_date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     reason = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(30), nullable=False, default="PENDING_RETURN")
+    stock_restored = db.Column(db.Boolean, nullable=False, default=False)
     action_taken = db.Column(db.Text, nullable=True)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -265,6 +266,7 @@ class DeliveryReturn(db.Model):
             ),
             "reason": self.reason,
             "status": self.status,
+            "stock_restored": self.stock_restored,
             "action_taken": self.action_taken,
             "notes": self.notes,
             "created_at": (

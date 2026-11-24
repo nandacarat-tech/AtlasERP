@@ -2925,18 +2925,21 @@ def resolve_delivery_return(return_id):
     if action_taken is not None:
         delivery_return.action_taken = action_taken
 
-    # Logística Reversa Atômica: Se o status for alterado para RETURNED_TO_STOCK
-    if new_status == "RETURNED_TO_STOCK" and old_status != "RETURNED_TO_STOCK" and delivery_return.sale_id:
-        sale = db.session.get(Sale, delivery_return.sale_id)
-        if sale:
-            for item in sale.items:
-                product = db.session.get(Product, item.product_id)
-                if product:
-                    apply_stock_in(
-                        product=product,
-                        quantity=item.quantity,
-                        sale_id=sale.id,
-                    )
+    # Logística Reversa Atômica e Idempotente:
+    # Apenas repõe estoque se for alterado para RETURNED_TO_STOCK E o estoque ainda não tiver sido reposto nesta ocorrência
+    if new_status == "RETURNED_TO_STOCK":
+        if not delivery_return.stock_restored and delivery_return.sale_id:
+            sale = db.session.get(Sale, delivery_return.sale_id)
+            if sale:
+                for item in sale.items:
+                    product = db.session.get(Product, item.product_id)
+                    if product:
+                        apply_stock_in(
+                            product=product,
+                            quantity=item.quantity,
+                            sale_id=sale.id,
+                        )
+                delivery_return.stock_restored = True
 
     db.session.commit()
     return jsonify(delivery_return.to_dict())

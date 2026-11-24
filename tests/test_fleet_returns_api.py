@@ -126,3 +126,54 @@ def test_fleet_returns_summary(client):
     assert "total" in data
     assert "pending" in data
     assert "returned_to_stock" in data
+
+
+def test_exploit_infinite_stock_inflation_via_status_ping_pong(client, app):
+    """
+    PoC: Demonstra que alternar status entre RETURNED_TO_STOCK e RESCHEDULED
+    permite creditar o estoque indefinidamente em multiplas resolucoes da mesma devolucao.
+    """
+    with app.app_context():
+        customer = Customer(name="Cliente Inflacao", document="529.982.247-25", email="infla@teste.com")
+        db.session.add(customer)
+        product = Product(sku="PROD-INFLA-01", name="Notebook Gamer", price="5000.00", stock_quantity=10, minimum_stock=1)
+        db.session.add(product)
+        db.session.commit()
+        prod_id = product.id
+
+        sale = Sale(customer_id=customer.id, total_amount="5000.00", status="CONFIRMED")
+        db.session.add(sale)
+        db.session.commit()
+
+        sale_item = SaleItem(sale_id=sale.id, product_id=prod_id, quantity=5, unit_price="5000.00")
+        db.session.add(sale_item)
+        db.session.commit()
+        sale_id = sale.id
+
+    # 1. Cria devolucao
+    res_create = client.post("/api/fleet/returns", json={
+        "customer_name": "Cliente Inflacao",
+        "sale_id": sale_id,
+        "reason": "CLIENT_REFUSED"
+    })
+    return_id = res_create.get_json()["id"]
+
+    # 2. Primeira devolucao ao estoque: 10 + 5 = 15 unidades
+    client.post(f"/api/fleet/returns/{return_id}/resolve", json={"status": "RETURNED_TO_STOCK"})
+
+    with app.app_context():
+        p1 = db.session.get(Product, prod_id)
+        assert p1.stock_quantity == 15
+
+    # 3. Ataque: Altera para RESCHEDULED
+    client.post(f"/api/fleet/returns/{return_id}/resolve", json={"status": "RESCHEDULED"})
+
+    # 4. Ataque: Altera novamente para RETURNED_TO_STOCK
+    client.post(f"/api/fleet/returns/{return_id}/resolve", json={"status": "RETURNED_TO_STOCK"})
+
+    with app.app_context():
+        p2 = db.session.get(Product, prod_id)
+        # Com a protecao idempotente ativa, o estoque NAO infla para 20, permanecendo em 15!
+        assert p2.stock_quantity == 15
+        ret = db.session.get(DeliveryReturn, return_id)
+        assert ret.stock_restored is True
