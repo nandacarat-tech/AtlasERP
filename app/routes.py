@@ -22,6 +22,7 @@ from app.stock_movement_models import StockMovement
 from app.stock_movement_service import (
     StockMovementError,
     apply_stock_out,
+    apply_stock_in,
 )
 from app.supplier_models import Supplier
 from app.financial_models import (
@@ -1852,6 +1853,7 @@ def fleet_vehicle_to_dict(vehicle):
 
 @main.get("/fleet/vehicles")
 @main.get("/api/fleet/vehicles")
+@permission_required("fleet.view")
 def list_fleet_vehicles():
     vehicles = FleetVehicle.query.order_by(FleetVehicle.id.desc()).all()
 
@@ -1862,6 +1864,7 @@ def list_fleet_vehicles():
 
 
 @main.post("/fleet/vehicles")
+@permission_required("fleet.manage")
 def create_fleet_vehicle():
     data = request.get_json(silent=True) or {}
 
@@ -1940,6 +1943,7 @@ def create_fleet_vehicle():
 
 @main.get("/fleet/maintenances")
 @main.get("/api/fleet/maintenances")
+@permission_required("fleet.view")
 def list_fleet_maintenances():
     vehicle_id = request.args.get("vehicle_id", type=int)
     status = request.args.get("status")
@@ -1964,6 +1968,7 @@ def list_fleet_maintenances():
 
 
 @main.post("/fleet/maintenances")
+@permission_required("fleet.manage")
 def create_fleet_maintenance():
     data = request.get_json(silent=True) or {}
 
@@ -2027,6 +2032,7 @@ def create_fleet_maintenance():
 
 
 @main.get("/fleet/maintenances/<int:maintenance_id>")
+@permission_required("fleet.view")
 def get_fleet_maintenance(maintenance_id):
     maintenance = db.session.get(FleetMaintenance, maintenance_id)
 
@@ -2039,6 +2045,7 @@ def get_fleet_maintenance(maintenance_id):
 
 
 @main.put("/fleet/maintenances/<int:maintenance_id>")
+@permission_required("fleet.manage")
 def update_fleet_maintenance(maintenance_id):
     maintenance = db.session.get(FleetMaintenance, maintenance_id)
 
@@ -2131,12 +2138,14 @@ def route_to_dict(route):
 
 @main.get("/fleet/drivers")
 @main.get("/api/fleet/drivers")
+@permission_required("fleet.view")
 def list_fleet_drivers():
     drivers = Driver.query.order_by(Driver.id.desc()).all()
     return jsonify([driver.to_dict() for driver in drivers])
 
 
 @main.post("/fleet/drivers")
+@permission_required("fleet.manage")
 def create_fleet_driver():
     data = request.get_json(silent=True) or {}
 
@@ -2213,6 +2222,7 @@ def create_fleet_driver():
 
 
 @main.get("/fleet/drivers/<int:driver_id>")
+@permission_required("fleet.view")
 def get_fleet_driver(driver_id):
     driver = db.session.get(Driver, driver_id)
     if driver is None:
@@ -2222,6 +2232,7 @@ def get_fleet_driver(driver_id):
 
 
 @main.put("/fleet/drivers/<int:driver_id>")
+@permission_required("fleet.manage")
 def update_fleet_driver(driver_id):
     driver = db.session.get(Driver, driver_id)
     if driver is None:
@@ -2295,6 +2306,7 @@ def update_fleet_driver(driver_id):
 
 
 @main.delete("/fleet/drivers/<int:driver_id>")
+@permission_required("fleet.manage")
 def deactivate_fleet_driver(driver_id):
     driver = db.session.get(Driver, driver_id)
     if driver is None:
@@ -2321,12 +2333,14 @@ ROUTE_STATUSES = {
 
 @main.get("/fleet/routes")
 @main.get("/api/fleet/routes")
+@permission_required("fleet.view")
 def list_fleet_routes():
     routes = Route.query.order_by(Route.start_date.desc(), Route.id.desc()).all()
     return jsonify([route.to_dict() for route in routes])
 
 
 @main.post("/fleet/routes")
+@permission_required("fleet.manage")
 def create_fleet_route():
     data = request.get_json(silent=True) or {}
 
@@ -2399,6 +2413,7 @@ def create_fleet_route():
 
 
 @main.get("/fleet/routes/<int:route_id>")
+@permission_required("fleet.view")
 def get_fleet_route(route_id):
     route = db.session.get(Route, route_id)
     if route is None:
@@ -2408,6 +2423,7 @@ def get_fleet_route(route_id):
 
 
 @main.put("/fleet/routes/<int:route_id>")
+@permission_required("fleet.manage")
 def update_fleet_route(route_id):
     route = db.session.get(Route, route_id)
     if route is None:
@@ -2472,6 +2488,7 @@ def update_fleet_route(route_id):
 
 
 @main.delete("/fleet/routes/<int:route_id>")
+@permission_required("fleet.manage")
 def delete_fleet_route(route_id):
     route = db.session.get(Route, route_id)
     if route is None:
@@ -2824,11 +2841,13 @@ def emit_financial_invoice(invoice_id):
 # --- Rotas da UI e API para Retorno de Entregas (Módulo Frota) ---
 
 @main.get("/ui/fleet/returns")
+@login_required
 def ui_fleet_returns():
     return render_template("fleet_returns.html")
 
 
 @main.get("/api/fleet/returns")
+@permission_required("fleet.view")
 def list_delivery_returns():
     status_filter = request.args.get("status")
     reason_filter = request.args.get("reason")
@@ -2844,6 +2863,7 @@ def list_delivery_returns():
 
 
 @main.post("/api/fleet/returns")
+@permission_required("fleet.manage")
 def create_delivery_return():
     data = request.get_json(silent=True) or {}
 
@@ -2887,6 +2907,7 @@ def create_delivery_return():
 
 
 @main.post("/api/fleet/returns/<int:return_id>/resolve")
+@permission_required("fleet.manage")
 def resolve_delivery_return(return_id):
     delivery_return = db.session.get(DeliveryReturn, return_id)
     if not delivery_return:
@@ -2904,31 +2925,25 @@ def resolve_delivery_return(return_id):
     if action_taken is not None:
         delivery_return.action_taken = action_taken
 
-    # Logística Reversa Automática: Se o status for alterado para RETURNED_TO_STOCK
+    # Logística Reversa Atômica: Se o status for alterado para RETURNED_TO_STOCK
     if new_status == "RETURNED_TO_STOCK" and old_status != "RETURNED_TO_STOCK" and delivery_return.sale_id:
         sale = db.session.get(Sale, delivery_return.sale_id)
         if sale:
             for item in sale.items:
                 product = db.session.get(Product, item.product_id)
                 if product:
-                    stock_before = product.stock_quantity
-                    product.stock_quantity += item.quantity
-                    stock_after = product.stock_quantity
-                    stock_movement = StockMovement(
-                        product_id=product.id,
-                        sale_id=sale.id,
-                        movement_type="IN",
+                    apply_stock_in(
+                        product=product,
                         quantity=item.quantity,
-                        stock_before=stock_before,
-                        stock_after=stock_after,
+                        sale_id=sale.id,
                     )
-                    db.session.add(stock_movement)
 
     db.session.commit()
     return jsonify(delivery_return.to_dict())
 
 
 @main.get("/api/fleet/returns/summary")
+@permission_required("fleet.view")
 def get_fleet_returns_summary():
     total = DeliveryReturn.query.count()
     pending = DeliveryReturn.query.filter_by(status="PENDING_RETURN").count()
@@ -2946,6 +2961,7 @@ def get_fleet_returns_summary():
 
 
 @main.get("/api/fleet/vehicles/summary")
+@permission_required("fleet.view")
 def get_fleet_vehicles_summary():
     available = FleetVehicle.query.filter_by(status="AVAILABLE").count()
     in_use = FleetVehicle.query.filter_by(status="IN_USE").count()
@@ -2963,12 +2979,14 @@ def get_fleet_vehicles_summary():
 
 
 @main.get("/api/fleet/drivers/count")
+@permission_required("fleet.view")
 def get_fleet_drivers_count():
     total = Driver.query.filter_by(status="ACTIVE").count()
     return jsonify({"total": total})
 
 
 @main.get("/api/fleet/routes/active/count")
+@permission_required("fleet.view")
 def get_fleet_active_routes_count():
     total = Route.query.filter_by(status="IN_PROGRESS").count()
     return jsonify({"total": total})

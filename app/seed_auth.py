@@ -1,4 +1,4 @@
-﻿from app import db
+from app import db
 from app.auth_models import Role, Permission, User
 
 
@@ -31,6 +31,10 @@ DEFAULT_PERMISSIONS = [
     {"code": "financial.view", "module": "Financeiro", "description": "Visualizar transacoes e relatorios financeiros"},
     {"code": "financial.manage", "module": "Financeiro", "description": "Cadastrar, liquidar e gerenciar titulos financeiros"},
 
+    # Frota e Logistica
+    {"code": "fleet.view", "module": "Frota", "description": "Visualizar veiculos, rotas, motoristas e devolucoes"},
+    {"code": "fleet.manage", "module": "Frota", "description": "Cadastrar, gerenciar frota e resolver devolucoes"},
+
     # Administracao & Seguranca
     {"code": "users.manage", "module": "Segurança", "description": "Cadastrar, editar e bloquear usuarios e perfis"},
     {"code": "audit.view", "module": "Segurança", "description": "Visualizar a trilha de auditoria do sistema"},
@@ -46,6 +50,7 @@ ROLE_MATRIX = {
         "customers.view", "customers.manage",
         "suppliers.view", "suppliers.manage",
         "financial.view", "audit.view",
+        "fleet.view", "fleet.manage",
     ],
     "VENDEDOR": [
         "sales.view", "sales.create",
@@ -62,6 +67,7 @@ ROLE_MATRIX = {
     "CONSULTA": [
         "sales.view", "purchases.view", "stock.view",
         "products.view", "customers.view", "suppliers.view",
+        "fleet.view",
     ],
 }
 

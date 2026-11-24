@@ -45,7 +45,7 @@ def apply_stock_out(*, product, quantity, sale_id=None):
     return movement
 
 
-def apply_stock_in(*, product, quantity, purchase_id=None):
+def apply_stock_in(*, product, quantity, purchase_id=None, sale_id=None):
     if quantity <= 0:
         raise StockMovementError(
             "quantity must be greater than zero"
@@ -64,6 +64,7 @@ def apply_stock_in(*, product, quantity, purchase_id=None):
     movement = StockMovement(
         product_id=product.id,
         purchase_id=purchase_id,
+        sale_id=sale_id,
         movement_type="IN",
         quantity=quantity,
         stock_before=stock_before,
