@@ -53,6 +53,11 @@ from app.rate_limit_service import (
     reset_attempts,
 )
 from app.csrf_service import csrf_protect
+from app.payload_validators import (
+    get_json_dict,
+    validate_string_field,
+    validate_price_bounds,
+)
 
 
 main = Blueprint("main", __name__)
@@ -737,24 +742,28 @@ def list_products():
 @main.post("/products")
 @permission_required("products.manage")
 def create_product():
-    data = request.get_json(silent=True) or {}
+    data, error_resp = get_json_dict(request)
+    if error_resp:
+        return error_resp
 
     if any(not data.get(field) for field in ("sku", "name", "price")):
         return jsonify({
             "error": "sku, name and price are required"
         }), 400
 
-    try:
-        price = Decimal(str(data["price"]))
-    except (InvalidOperation, ValueError):
-        return jsonify({
-            "error": "price must be a valid number"
-        }), 400
+    is_valid_sku, sku_err = validate_string_field(data.get("sku"), "sku", max_len=50)
+    if not is_valid_sku:
+        return jsonify({"error": sku_err}), 400
 
-    if price < 0:
-        return jsonify({
-            "error": "price cannot be negative"
-        }), 400
+    is_valid_name, name_err = validate_string_field(data.get("name"), "name", max_len=100)
+    if not is_valid_name:
+        return jsonify({"error": name_err}), 400
+
+    is_valid_price, price_err = validate_price_bounds(data.get("price"))
+    if not is_valid_price:
+        return jsonify({"error": price_err}), 400
+
+    price = Decimal(str(data["price"]))
 
     if Product.query.filter_by(sku=data["sku"]).first():
         return jsonify({
@@ -947,7 +956,9 @@ def list_customers():
 @main.post("/customers")
 @permission_required("customers.manage")
 def create_customer():
-    data = request.get_json(silent=True) or {}
+    data, error_resp = get_json_dict(request)
+    if error_resp:
+        return error_resp
 
     if not data.get("document") or not data.get("name"):
         return jsonify({
@@ -1092,7 +1103,9 @@ def deactivate_customer(customer_id):
 @main.post("/sales")
 @permission_required("sales.create")
 def create_sale():
-    data = request.get_json(silent=True) or {}
+    data, error_resp = get_json_dict(request)
+    if error_resp:
+        return error_resp
 
     customer_id = data.get("customer_id")
     items_data = data.get("items")
@@ -1106,6 +1119,30 @@ def create_sale():
         return jsonify({
             "error": "items must be a non-empty list"
         }), 400
+
+    for item in items_data:
+        if not isinstance(item, dict):
+            return jsonify({
+                "error": "each item must be a JSON object"
+            }), 400
+
+        pid = item.get("product_id")
+        qty = item.get("quantity")
+
+        if pid is None or not isinstance(qty, int) or isinstance(qty, bool):
+            return jsonify({
+                "error": "product_id and integer quantity are required"
+            }), 400
+
+        if qty <= 0:
+            return jsonify({
+                "error": "quantity must be greater than zero"
+            }), 400
+
+        if qty > 10000:
+            return jsonify({
+                "error": "quantity cannot exceed 10000"
+            }), 400
 
     product_ids = [item.get("product_id") for item in items_data]
 
@@ -1526,7 +1563,10 @@ def update_supplier(supplier_id):
 @main.post("/purchases")
 @permission_required("purchases.create")
 def create_purchase():
-    data = request.get_json(silent=True) or {}
+    data, error_resp = get_json_dict(request)
+    if error_resp:
+        return error_resp
+
     supplier_id = data.get("supplier_id")
 
     if not supplier_id:
