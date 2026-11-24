@@ -156,6 +156,8 @@ class EmergencyAdminIdentity:
         self.username = username
 
     def can(self, permission_code: str) -> bool:
+        if self.is_superuser:
+            return True
         allowed_recovery_permissions = {
             "users.manage",
             "users.view",

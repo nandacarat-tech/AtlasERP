@@ -38,7 +38,14 @@ from app.purchase_service import (
 )
 from app.purchase_status import PURCHASE_STATUSES
 from app.auth_models import User
-from app.auth_service import authenticate_user, logout_user, log_audit_event
+from app.auth_service import (
+    authenticate_user,
+    logout_user,
+    log_audit_event,
+    login_required,
+    permission_required,
+    role_required,
+)
 
 
 main = Blueprint("main", __name__)
@@ -221,15 +228,6 @@ def parse_optional_decimal(value, field_name):
         raise ValueError(f"{field_name} deve ser um número válido")
 
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get("user_authenticated"):
-            if request.path.startswith("/api/") or request.is_json:
-                return jsonify({"error": "Autenticação requerida."}), 401
-            return redirect(url_for("main.login", next=request.path))
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 def financial_required(f):
@@ -549,7 +547,7 @@ def dashboard():
 
 
 @main.get("/ui/products")
-@login_required
+@permission_required("products.view")
 def products_page():
     return render_template("products.html")
 
@@ -585,25 +583,25 @@ def fleet_routes_page():
 
 
 @main.get("/ui/customers")
-@login_required
+@permission_required("customers.view")
 def customers_page():
     return render_template("customers.html")
 
 
 @main.get("/ui/sales")
-@login_required
+@permission_required("sales.view")
 def sales_page():
     return render_template("sales.html")
 
 
 @main.get("/ui/suppliers")
-@login_required
+@permission_required("suppliers.view")
 def suppliers_page():
     return render_template("suppliers.html")
 
 
 @main.get("/ui/purchases")
-@login_required
+@permission_required("purchases.view")
 def purchases_page():
     return render_template("purchases.html")
 
@@ -634,12 +632,14 @@ def financial_invoices_page():
 
 
 @main.get("/products")
+@permission_required("products.view")
 def list_products():
     products = Product.query.order_by(Product.id).all()
     return jsonify([product_to_dict(product) for product in products])
 
 
 @main.post("/products")
+@permission_required("products.manage")
 def create_product():
     data = request.get_json(silent=True) or {}
 
@@ -712,12 +712,14 @@ def create_product():
 
 
 @main.get("/products/<int:product_id>")
+@permission_required("products.view")
 def get_product(product_id):
     product = db.get_or_404(Product, product_id)
     return jsonify(product_to_dict(product))
 
 
 @main.put("/products/<int:product_id>")
+@permission_required("products.manage")
 def update_product(product_id):
     product = db.get_or_404(Product, product_id)
     data = request.get_json(silent=True) or {}
@@ -788,6 +790,7 @@ def update_product(product_id):
 
 
 @main.delete("/products/<int:product_id>")
+@permission_required("products.manage")
 def delete_product(product_id):
     product = Product.query.get_or_404(product_id)
 
@@ -809,6 +812,7 @@ def delete_product(product_id):
 
 
 @main.delete("/products/<int:product_id>/permanent")
+@permission_required("products.manage")
 def permanently_delete_product(product_id):
     product = Product.query.get_or_404(product_id)
 
@@ -824,12 +828,14 @@ def permanently_delete_product(product_id):
 
 
 @main.get("/customers")
+@permission_required("customers.view")
 def list_customers():
     customers = Customer.query.order_by(Customer.id).all()
     return jsonify([customer_to_dict(customer) for customer in customers])
 
 
 @main.post("/customers")
+@permission_required("customers.manage")
 def create_customer():
     data = request.get_json(silent=True) or {}
 
@@ -877,12 +883,14 @@ def create_customer():
 
 
 @main.get("/customers/<int:customer_id>")
+@permission_required("customers.view")
 def get_customer(customer_id):
     customer = db.get_or_404(Customer, customer_id)
     return jsonify(customer_to_dict(customer))
 
 
 @main.put("/customers/<int:customer_id>")
+@permission_required("customers.manage")
 def update_customer(customer_id):
     customer = db.get_or_404(Customer, customer_id)
     data = request.get_json(silent=True) or {}
@@ -957,6 +965,7 @@ def update_customer(customer_id):
 
 
 @main.delete("/customers/<int:customer_id>")
+@permission_required("customers.manage")
 def deactivate_customer(customer_id):
     customer = db.get_or_404(Customer, customer_id)
 
@@ -971,6 +980,7 @@ def deactivate_customer(customer_id):
 
 
 @main.post("/sales")
+@permission_required("sales.create")
 def create_sale():
     data = request.get_json(silent=True) or {}
 
@@ -1063,6 +1073,7 @@ def create_sale():
 
 
 @main.get("/sales")
+@permission_required("sales.view")
 def list_sales():
     query = Sale.query.order_by(Sale.id)
 
@@ -1096,6 +1107,7 @@ def list_sales():
 
 
 @main.get("/sales/paginated")
+@permission_required("sales.view")
 def list_sales_paginated():
     query = Sale.query.order_by(Sale.id)
 
@@ -1159,12 +1171,14 @@ def list_sales_paginated():
 
 
 @main.get("/sales/<int:sale_id>")
+@permission_required("sales.view")
 def get_sale(sale_id):
     sale = db.get_or_404(Sale, sale_id)
 
     return jsonify(sale_to_dict(sale))
 
 @main.post("/sales/<int:sale_id>/confirm")
+@permission_required("sales.create")
 def confirm_sale(sale_id):
     sale = db.get_or_404(Sale, sale_id)
 
@@ -1211,6 +1225,7 @@ def confirm_sale(sale_id):
 
 
 @main.post("/sales/<int:sale_id>/cancel")
+@permission_required("sales.cancel")
 def cancel_sale(sale_id):
     sale = db.session.get(Sale, sale_id)
 
@@ -1232,6 +1247,7 @@ def cancel_sale(sale_id):
     }), 200
 
 @main.get("/products/<int:product_id>/stock-movements")
+@permission_required("stock.view")
 def list_stock_movements(product_id):
     product = db.session.get(Product, product_id)
 
@@ -1260,6 +1276,7 @@ def list_stock_movements(product_id):
 
 
 @main.post("/purchases/<int:purchase_id>/receive")
+@permission_required("purchases.create")
 def receive_purchase_route(purchase_id):
     purchase = db.session.get(Purchase, purchase_id)
 
@@ -1286,6 +1303,7 @@ def receive_purchase_route(purchase_id):
     )
 
 @main.post("/suppliers")
+@permission_required("suppliers.manage")
 def create_supplier():
     data = request.get_json(silent=True) or {}
 
@@ -1332,6 +1350,7 @@ def create_supplier():
     return jsonify(supplier_to_dict(supplier)), 201
 
 @main.get("/suppliers")
+@permission_required("suppliers.view")
 def list_suppliers():
     suppliers = Supplier.query.order_by(Supplier.id).all()
     return jsonify(
@@ -1339,6 +1358,7 @@ def list_suppliers():
     )
 
 @main.patch("/suppliers/<int:supplier_id>")
+@permission_required("suppliers.manage")
 def update_supplier(supplier_id):
     supplier = db.session.get(Supplier, supplier_id)
 
@@ -1394,6 +1414,7 @@ def update_supplier(supplier_id):
     return jsonify(supplier_to_dict(supplier))
 
 @main.post("/purchases")
+@permission_required("purchases.create")
 def create_purchase():
     data = request.get_json(silent=True) or {}
     supplier_id = data.get("supplier_id")
@@ -1423,6 +1444,7 @@ def create_purchase():
     return jsonify(purchase_to_dict(purchase)), 201
 
 @main.get("/purchases")
+@permission_required("purchases.view")
 def list_purchases():
     query = Purchase.query
 
@@ -1525,6 +1547,7 @@ def list_purchases():
 
 
 @main.post("/purchases/<int:purchase_id>/items")
+@permission_required("purchases.create")
 def add_purchase_item(purchase_id):
     purchase = db.session.get(Purchase, purchase_id)
 
@@ -1604,6 +1627,7 @@ def add_purchase_item(purchase_id):
 
 
 @main.get("/suppliers/<int:supplier_id>")
+@permission_required("suppliers.view")
 def get_supplier(supplier_id):
     supplier = db.session.get(Supplier, supplier_id)
 
@@ -1613,6 +1637,7 @@ def get_supplier(supplier_id):
     return jsonify(supplier_to_dict(supplier))
 
 @main.get("/purchases/<int:purchase_id>")
+@permission_required("purchases.view")
 def get_purchase(purchase_id):
     purchase = db.session.get(Purchase, purchase_id)
 
@@ -1622,6 +1647,7 @@ def get_purchase(purchase_id):
     return jsonify(purchase_to_dict(purchase))
 
 @main.post("/purchases/<int:purchase_id>/cancel")
+@permission_required("purchases.cancel")
 def cancel_purchase_route(purchase_id):
     purchase = db.session.get(Purchase, purchase_id)
 

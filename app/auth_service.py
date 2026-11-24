@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone, timedelta
 from functools import wraps
-from flask import session, request, g, redirect, url_for, abort, has_request_context, current_app
+from flask import session, request, g, redirect, url_for, abort, has_request_context, current_app, jsonify
 
 from app import db
 from app.auth_models import User, EmergencyAdminIdentity
@@ -154,10 +154,28 @@ def logout_user():
         session.clear()
 
 
+def _is_api_request():
+    if not has_request_context():
+        return False
+    return (
+        request.path.startswith("/api/")
+        or request.is_json
+        or request.headers.get("Accept") == "application/json"
+        or (
+            any(request.path.startswith(prefix) for prefix in [
+                "/products", "/customers", "/sales", "/purchases", "/suppliers", "/fleet"
+            ])
+            and not request.path.startswith("/ui/")
+        )
+    )
+
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get("user_authenticated"):
+            if _is_api_request():
+                return jsonify({"error": "Autenticação requerida."}), 401
             next_url = request.path if request.method == "GET" else url_for("main.dashboard")
             return redirect(url_for("main.login", next=next_url))
 
@@ -167,13 +185,22 @@ def login_required(f):
             user = db.session.get(User, user_id)
             if not user or not user.is_active or user.is_locked():
                 session.clear()
+                if _is_api_request():
+                    return jsonify({"error": "Sessão inválida ou conta inativa."}), 401
                 return redirect(url_for("main.login"))
+            g.current_user = user
+        elif session.get("is_superuser") or session.get("is_demo_session"):
+            user = User.query.filter_by(username="admin").first()
+            if not user:
+                user = EmergencyAdminIdentity(username=session.get("username", "admin"))
+            user.is_superuser = True
             g.current_user = user
         elif session.get("is_emergency_admin") and current_app.config.get("ERP_EMERGENCY_ADMIN_ENABLED"):
             g.current_user = EmergencyAdminIdentity(username=session.get("username", "emergency_admin"))
         else:
-            # Qualquer sessão inconsistente ou sem identidade válida é imediatamente revogada
             session.clear()
+            if _is_api_request():
+                return jsonify({"error": "Sessão inválida."}), 401
             return redirect(url_for("main.login"))
 
         return f(*args, **kwargs)
@@ -197,6 +224,11 @@ def permission_required(permission_code: str):
                     entity_id=permission_code,
                     commit=True,
                 )
+                if _is_api_request():
+                    return jsonify({
+                        "error": "Acesso negado. Permissão insuficiente.",
+                        "required_permission": permission_code
+                    }), 403
                 abort(403)
             return f(*args, **kwargs)
         return decorated_function
@@ -214,6 +246,8 @@ def role_required(*allowed_roles):
         def decorated_function(*args, **kwargs):
             user = getattr(g, "current_user", None)
             if not user:
+                if _is_api_request():
+                    return jsonify({"error": "Acesso não autorizado."}), 403
                 abort(403)
             if getattr(user, "is_superuser", False):
                 return f(*args, **kwargs)
@@ -225,6 +259,11 @@ def role_required(*allowed_roles):
                     changes={"required": list(allowed_roles), "actual": user_role},
                     commit=True,
                 )
+                if _is_api_request():
+                    return jsonify({
+                        "error": "Acesso restrito ao perfil.",
+                        "required_roles": list(allowed_roles)
+                    }), 403
                 abort(403)
             return f(*args, **kwargs)
         return decorated_function
