@@ -37,6 +37,8 @@ def auto_authenticate_legacy_tests(request, client, app):
         "test_auth_and_security",
         "test_rbac_and_audit",
         "test_rbac_routes_enforcement",
+        "test_rate_limiting",
+        "test_csrf_protection",
     ]):
         return
 

@@ -239,6 +239,7 @@
         </div>
         <p class="demo-desc">Explore o ERP em tempo real com permissões completas de Administrador (DRE, vendas, estoque e frota).</p>
         <form action="/login/demo" method="POST" style="margin: 0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="next" value="{{ next_url or '/dashboard' }}">
             <button type="submit" class="btn-demo">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -253,6 +254,7 @@
 
     <!-- Formulário Padrão -->
     <form action="/login" method="POST" id="loginForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="next" value="{{ next_url or '/dashboard' }}">
         
         <div class="form-group">

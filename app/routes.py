@@ -52,6 +52,7 @@ from app.rate_limit_service import (
     record_failed_attempt,
     reset_attempts,
 )
+from app.csrf_service import csrf_protect
 
 
 main = Blueprint("main", __name__)
@@ -279,6 +280,7 @@ def login():
 
 
 @main.post("/login/demo")
+@csrf_protect
 def login_demo():
     """
     Acesso direto de 1 clique para visitantes, clientes e recrutadores
@@ -314,6 +316,7 @@ def login_demo():
 
 
 @main.post("/login")
+@csrf_protect
 def process_login():
     username = str(request.form.get("username", "")).strip()
     # Preserva rigorosamente os caracteres da senha digitada (sem .strip())
@@ -422,6 +425,7 @@ def process_login():
 
 
 @main.post("/logout")
+@csrf_protect
 def logout():
     """
     Encerramento de sessão seguro restrito a requisições HTTP POST.
@@ -441,6 +445,7 @@ def financial_unlock():
 
 
 @main.post("/financial/unlock")
+@csrf_protect
 def process_financial_unlock():
     if not session.get("user_authenticated"):
         return redirect(url_for("main.login"))
@@ -494,6 +499,7 @@ def process_financial_unlock():
 
 
 @main.post("/financial/unlock/demo")
+@csrf_protect
 def process_financial_unlock_demo():
     """
     Desbloqueio com 1 clique do módulo financeiro para visitantes da vitrine.

@@ -55,6 +55,17 @@ def create_app(config_object=None):
         from werkzeug.middleware.proxy_fix import ProxyFix
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
+    from app.csrf_service import generate_csrf_token, validate_request_origin
+
+    app.jinja_env.globals["csrf_token"] = generate_csrf_token
+
+    @app.before_request
+    def check_csrf_origin():
+        if not validate_request_origin():
+            if _is_json_request():
+                return jsonify({"error": "Origem cruzada não autorizada (CSRF bloqueado)."}), 403
+            return ("Acesso bloqueado: requisição de origem cruzada detectada (CSRF Protection).", 403)
+
     # Injeção automática de Cabeçalhos de Segurança HTTP (OWASP / Hardening)
     @app.after_request
     def apply_security_headers(response):
